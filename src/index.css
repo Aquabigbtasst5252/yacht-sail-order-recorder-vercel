@@ -1,0 +1,9 @@
+/* All default Vite styles have been removed from this file.
+  This is now the correct place to add any of your own custom global styles
+  that you want to apply across the entire application.
+*/
+
+body {
+  /* For example, you could change the default background color here */
+  /* background-color: #f8f9fa; */
+}

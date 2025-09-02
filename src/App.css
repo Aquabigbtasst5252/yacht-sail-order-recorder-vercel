@@ -1,0 +1,6 @@
+/* All default Vite styles have been removed from this file.
+  The styles that were here, especially for #root, were overriding
+  Bootstrap and causing the layout to be fixed-width and centered.
+  This file can now be used for specific styles related to the App component,
+  or it can be deleted if you don't need it.
+*/
