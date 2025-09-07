@@ -103,11 +103,21 @@ export default function App() {
     };
 
     useEffect(() => {
-        const xlsxScript = document.createElement('script');
-        xlsxScript.src = "https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js";
-        xlsxScript.onload = () => { XLSX = window.XLSX; };
-        document.head.appendChild(xlsxScript);
+        // Load XLSX library
+        loadScript("https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js")
+            .then(() => {
+                XLSX = window.XLSX;
+            })
+            .catch(err => console.error("Failed to load XLSX script:", err));
         
+        // Load PDF generation libraries
+        loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js")
+            .then(() => {
+                // Chain load autotable plugin after jspdf is loaded
+                return loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js");
+            })
+            .catch(err => console.error("Failed to load PDF generation scripts:", err));
+
         const applyTheme = () => {
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                 document.documentElement.setAttribute('data-bs-theme', 'dark');
@@ -1692,6 +1702,10 @@ const CustomerStock = ({ user }) => {
         setLoading(true);
         setError("");
 
+        // Fetch existing stock to compare against
+        const existingStockSnapshot = await getDocs(collection(db, "stock", selectedCustomer, "items"));
+        const existingStockMap = new Map(existingStockSnapshot.docs.map(doc => [doc.id, doc.data()]));
+
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
@@ -1707,26 +1721,39 @@ const CustomerStock = ({ user }) => {
                 }
 
                 const requiredHeaders = ['PART_NO', 'DESCRIPTION', 'TOTAL_QTY'];
-                const firstRow = json[0];
-                for (const header of requiredHeaders) {
-                    if (!(header in firstRow)) {
-                        throw new Error(`Missing required column header: ${header}`);
-                    }
+                if (!requiredHeaders.every(header => header in json[0])) {
+                    throw new Error(`File is missing one of the required column headers: ${requiredHeaders.join(', ')}`);
                 }
 
                 const batch = writeBatch(db);
                 const collectionRef = collection(db, "stock", selectedCustomer, "items");
+                let newItemsCount = 0;
+                let updatedItemsCount = 0;
 
                 json.forEach((row) => {
                     const partNo = String(row.PART_NO).trim();
                     if (partNo) {
                         const docRef = doc(collectionRef, partNo);
-                        batch.set(docRef, {
-                            PART_NO: partNo,
-                            DESCRIPTION: row.DESCRIPTION || '',
-                            TOTAL_QTY: row.TOTAL_QTY || 0,
-                            category: 'Unassigned'
-                        });
+                        const existingItem = existingStockMap.get(partNo);
+
+                        if (existingItem) {
+                            // Item exists: update it but preserve the category
+                            batch.set(docRef, {
+                                PART_NO: partNo,
+                                DESCRIPTION: row.DESCRIPTION || '',
+                                TOTAL_QTY: row.TOTAL_QTY || 0,
+                            }, { merge: true }); // Use merge to avoid overwriting the category
+                            updatedItemsCount++;
+                        } else {
+                            // Item is new: add it with 'Unassigned' category
+                            batch.set(docRef, {
+                                PART_NO: partNo,
+                                DESCRIPTION: row.DESCRIPTION || '',
+                                TOTAL_QTY: row.TOTAL_QTY || 0,
+                                category: 'Unassigned'
+                            });
+                            newItemsCount++;
+                        }
                     }
                 });
                 
@@ -1734,7 +1761,7 @@ const CustomerStock = ({ user }) => {
                 batch.update(customerDocRef, { lastStockUpdate: serverTimestamp() });
 
                 await batch.commit();
-                alert(`Successfully uploaded ${json.length} stock items for the selected customer.`);
+                alert(`Stock updated successfully!\n- ${updatedItemsCount} items updated.\n- ${newItemsCount} new items added.`);
                 setSelectedFile(null);
                 if (fileInputRef.current) {
                     fileInputRef.current.value = "";
@@ -1853,6 +1880,43 @@ const CustomerStock = ({ user }) => {
                     </div>
                 )}
                 
+                {/* Unassigned Items Panel */}
+                {isAdmin && groupedAndFilteredItems.unassigned.length > 0 && (
+                    <div className="card mb-4 border-warning">
+                        <div className="card-header bg-warning-subtle">
+                            <h3 className="h5 mb-0">Unassigned Stock Items ({groupedAndFilteredItems.unassigned.length})</h3>
+                            <p className="mb-0 text-muted small">These new items need to be assigned a category below.</p>
+                        </div>
+                        <div className="card-body p-0">
+                            <div className="table-responsive">
+                                <table className="table table-sm table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>PART_NO</th>
+                                            <th>DESCRIPTION</th>
+                                            <th>TOTAL_QTY</th>
+                                            <th>Category</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {groupedAndFilteredItems.unassigned.map(item => (
+                                            <tr key={item.id}>
+                                                <td>{item.PART_NO}</td>
+                                                <td>{item.DESCRIPTION}</td>
+                                                <td>{item.TOTAL_QTY}</td>
+                                                <td><CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} /></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+
+                {/* Categorized Items Table */}
+                <h3 className="h5 mb-3 mt-4">Categorized Stock</h3>
                 <div className="table-responsive">
                     <table className="table table-sm table-hover table-bordered">
                         <thead>
@@ -1864,20 +1928,6 @@ const CustomerStock = ({ user }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {groupedAndFilteredItems.unassigned.length > 0 && (
-                                <>
-                                    <tr className="table-light"><th colSpan={isAdmin ? 4 : 3}>Unassigned</th></tr>
-                                    {groupedAndFilteredItems.unassigned.map(item => (
-                                        <tr key={item.id}>
-                                            <td>{item.PART_NO}</td>
-                                            <td>{item.DESCRIPTION}</td>
-                                            <td>{item.TOTAL_QTY}</td>
-                                            {isAdmin && <td><CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} /></td>}
-                                        </tr>
-                                    ))}
-                                </>
-                            )}
-
                             {Object.entries({ "Sail Materials": groupedAndFilteredItems["Sail Materials"], "Sail Hardware": groupedAndFilteredItems["Sail Hardware"] }).map(([mainCategory, subCategories]) => (
                                 Object.keys(subCategories).length > 0 && (
                                     <React.Fragment key={mainCategory}>
