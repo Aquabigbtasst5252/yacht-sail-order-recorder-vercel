@@ -72,6 +72,21 @@ const getCurrentWeekString = () => {
     return `${year}-W${String(weekNumber).padStart(2, '0')}`;
 };
 
+// Helper function to load a script dynamically and return a promise
+const loadScript = (src) => {
+    return new Promise((resolve, reject) => {
+        if (document.querySelector(`script[src="${src}"]`)) {
+            resolve();
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+};
+
 // --- Main App Component ---
 export default function App() {
     const [user, setUser] = useState(null);
@@ -89,21 +104,11 @@ export default function App() {
     };
 
     useEffect(() => {
-        // --- CDN Library Injection ---
         const xlsxScript = document.createElement('script');
         xlsxScript.src = "https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js";
         xlsxScript.onload = () => { XLSX = window.XLSX; };
         document.head.appendChild(xlsxScript);
         
-        const jspdfScript = document.createElement('script');
-        jspdfScript.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-        document.head.appendChild(jspdfScript);
-
-        const autotableScript = document.createElement('script');
-        autotableScript.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js";
-        document.head.appendChild(autotableScript);
-        
-        // --- Dark Mode Setup for Bootstrap ---
         const applyTheme = () => {
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                 document.documentElement.setAttribute('data-bs-theme', 'dark');
@@ -228,7 +233,6 @@ export default function App() {
 }
 
 // --- Screens & Major Components ---
-// All component definitions must come before the App component uses them.
 
 const PendingAccessScreen = ({ message, companyName, logoUrl }) => (
     <div className="d-flex align-items-center justify-content-center vh-100 bg-body-tertiary">
