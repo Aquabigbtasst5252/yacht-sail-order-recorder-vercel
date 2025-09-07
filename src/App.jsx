@@ -206,9 +206,11 @@ export default function App() {
              };
             return (
                 <div className="d-flex flex-column vh-100">
-                    <DashboardHeader user={userData} onSignOut={handleSignOut} onNavigate={handleNavigation} settings={settings} />
-                    <main className="container-fluid my-4 flex-grow-1">{renderPage()}</main>
-                </div>
+            <DashboardHeader user={userData} onSignOut={handleSignOut} onNavigate={handleNavigation} settings={settings} />
+            <main className="container-fluid my-4 flex-grow-1">
+                {renderPage()}
+            </main>
+        </div>
             );
         }
 
