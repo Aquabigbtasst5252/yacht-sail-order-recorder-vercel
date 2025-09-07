@@ -194,7 +194,6 @@ export default function App() {
                     <PublicHeader onNavigate={handleNavigation} settings={settings} />
                      <main className="container my-4 flex-grow-1">
                         {publicPageMap[currentPage] || <HomePage onLoginSuccess={() => handleNavigation('dashboard')} settings={settings} />}
-                        <p>DEBUG - Project ID: {import.meta.env.VITE_PROJECT_ID || "NOT FOUND"}</p>
                     </main>
                     <PublicFooter />
                 </div>
