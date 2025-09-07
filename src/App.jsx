@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Select from 'react-select';
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 
 // --- Firebase SDK Imports ---
@@ -549,6 +551,7 @@ const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
 const Dashboard = ({ user }) => {
     const [weeklyOrders, setWeeklyOrders] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
     const currentWeek = useMemo(() => getCurrentWeekString(), []);
 
     const getStatusBadgeClass = (status) => {
@@ -610,7 +613,11 @@ const Dashboard = ({ user }) => {
                                 <tbody>
                                     {weeklyOrders.map(order => (
                                         <tr key={order.id}>
-                                            <td>{order.aquaOrderNumber}</td>
+                                            <td>
+                                                <a href="#" onClick={(e) => { e.preventDefault(); setViewingHistoryFor(order); }}>
+                                                    {order.aquaOrderNumber}
+                                                </a>
+                                            </td>
                                             {user.role !== 'customer' && <td>{order.customerCompanyName}</td>}
                                             <td>{order.customerPO}</td>
                                             <td>{order.productName}</td>
@@ -623,6 +630,12 @@ const Dashboard = ({ user }) => {
                     )}
                 </div>
             </div>
+             {viewingHistoryFor && (
+                <OrderHistoryModal 
+                    order={viewingHistoryFor}
+                    onClose={() => setViewingHistoryFor(null)}
+                />
+            )}
         </div>
     );
 };
@@ -972,6 +985,7 @@ const OrderList = ({ user }) => {
     const [orders, setOrders] = useState([]);
     const [editingOrder, setEditingOrder] = useState(null);
     const [qcOrder, setQcOrder] = useState(null);
+    const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState('all'); // 'all', 'sails', or 'accessories'
@@ -1092,7 +1106,11 @@ const OrderList = ({ user }) => {
                             {currentEntries.map(order => (
                                 <tr key={order.id} className={order.status === 'Cancelled' ? 'table-danger' : ''}>
                                     <td>{order.createdAt?.toDate().toLocaleDateString() || 'N/A'}</td>
-                                    <td>{order.aquaOrderNumber}</td>
+                                    <td>
+                                        <a href="#" onClick={(e) => { e.preventDefault(); setViewingHistoryFor(order); }}>
+                                            {order.aquaOrderNumber}
+                                        </a>
+                                    </td>
                                     <td>{order.customerPO}</td>
                                     <td>{order.ifsOrderNo}</td>
                                     {!isCustomer && <td>{order.customerCompanyName}</td>}
@@ -1165,6 +1183,13 @@ const OrderList = ({ user }) => {
                     order={qcOrder}
                     user={user}
                     onClose={() => setQcOrder(null)}
+                />
+            )}
+
+            {viewingHistoryFor && (
+                <OrderHistoryModal 
+                    order={viewingHistoryFor}
+                    onClose={() => setViewingHistoryFor(null)}
                 />
             )}
         </div>
@@ -1303,7 +1328,7 @@ const WeeklyScheduleView = ({ user }) => {
                         fileName={`production_schedule_${selectedWeek || 'all'}.pdf`}
                         className={`btn btn-secondary ${!selectedWeek ? 'disabled' : ''}`}
                     >
-                        {({ loading }) => (loading ? 'Loading document...' : 'Export to PDF')}
+                        {({ loading }) => (loading ? 'Loading...' : 'Export to PDF')}
                     </PDFDownloadLink>
                 )}
                 <div className="col-md-4">
@@ -1484,6 +1509,7 @@ const AllActiveOrdersView = ({ user }) => {
     const [activeOrders, setActiveOrders] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
     const isCustomer = user.role === 'customer';
 
     useEffect(() => {
@@ -1566,18 +1592,27 @@ const AllActiveOrdersView = ({ user }) => {
                             <tr className="table-light"><th colSpan="6" className="ps-2">{customerName}</th></tr>
                             {groupedAndFilteredOrders[customerName].map(order => (
                                 <tr key={order.id}>
-                                    <td>{order.aquaOrderNumber}</td>
+                                    <td>
+                                        <a href="#" onClick={(e) => { e.preventDefault(); setViewingHistoryFor(order); }}>
+                                            {order.aquaOrderNumber}
+                                        </a>
+                                    </td>
                                     <td>{order.customerPO}</td>
                                     <td>{order.ifsOrderNo}</td>
                                     <td>{`${order.productName} - ${order.material} - ${order.size}`}</td>
                                     <td>{order.quantity}</td>
                                     <td>
-                                        <input 
-                                            type="date" 
-                                            defaultValue={order.deliveryDate || ''} 
-                                            onChange={(e) => handleDateChange(order.id, e.target.value)} 
-                                            className="form-control form-control-sm" 
-                                            disabled={isCustomer} 
+                                        <DatePicker
+                                            selected={order.deliveryDate ? new Date(order.deliveryDate + 'T00:00:00Z') : null}
+                                            onChange={(date) => {
+                                                const dateString = date ? date.toISOString().split('T')[0] : '';
+                                                handleDateChange(order.id, dateString);
+                                            }}
+                                            showWeekNumbers
+                                            className="form-control form-control-sm"
+                                            placeholderText="Select date"
+                                            dateFormat="yyyy-MM-dd"
+                                            disabled={isCustomer}
                                         />
                                     </td>
                                 </tr>
@@ -1586,6 +1621,12 @@ const AllActiveOrdersView = ({ user }) => {
                     ))}
                 </table>
             </div>
+            {viewingHistoryFor && (
+                <OrderHistoryModal 
+                    order={viewingHistoryFor}
+                    onClose={() => setViewingHistoryFor(null)}
+                />
+            )}
         </div>
     );
 };
@@ -2011,6 +2052,19 @@ const UserManagementTab = () => {
         setEditName('');
     };
 
+    const handleDeleteUser = async (userId, userName) => {
+        const warning = "WARNING: This only deletes the user's application data (role, status, etc.). It does NOT delete their login account from the authentication system. For full deletion, a backend function is required.\n\n";
+        if (window.confirm(`${warning}Are you sure you want to delete the user data for ${userName}?`)) {
+            try {
+                await deleteDoc(doc(db, "users", userId));
+                alert('User data deleted successfully.');
+            } catch (error) {
+                console.error("Error deleting user data: ", error);
+                alert('Failed to delete user data.');
+            }
+        }
+    };
+
     return (
         <div>
             <h3 className="h5 mb-3">Manage User Roles and Status</h3>
@@ -2023,7 +2077,7 @@ const UserManagementTab = () => {
                             <th>Role</th>
                             <th>Status</th>
                             <th>Assign Customer</th>
-                            <th style={{width: "150px"}}>Actions</th>
+                            <th style={{width: "220px"}}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>{users.map(u => (
@@ -2084,7 +2138,10 @@ const UserManagementTab = () => {
                                         <button className="btn btn-sm btn-secondary" onClick={handleCancelClick}>Cancel</button>
                                     </>
                                 ) : (
-                                    <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditClick(u)}>Edit Name</button>
+                                    <>
+                                    <button className="btn btn-sm btn-outline-primary me-2" onClick={() => handleEditClick(u)}>Edit Name</button>
+                                    <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteUser(u.id, u.name)}>Delete</button>
+                                    </>
                                 )}
                             </td>
                         </tr>
