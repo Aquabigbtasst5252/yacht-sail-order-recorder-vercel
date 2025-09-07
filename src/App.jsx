@@ -46,13 +46,13 @@ let XLSX;
 
 // --- Canvas Environment Firebase Configuration ---
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'aqua-dynamics-app';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-    apiKey: "AIzaSyCAzaVznj_lFYNfmFaAXt8fM28iPrmAa2c",
-    authDomain: "yacht-sail-order-recorder.firebaseapp.com",
-    projectId: "yacht-sail-order-recorder",
-    storageBucket: "yacht-sail-order-recorder.firebasestorage.app",
-    messagingSenderId: "940737975723",
-    appId: "1:940737975723:web:17f9cb62196880be80eeee"
+const firebaseConfig = {
+    apiKey: import.meta.env.VITE_API_KEY,
+    authDomain: import.meta.env.VITE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_APP_ID
 };
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
