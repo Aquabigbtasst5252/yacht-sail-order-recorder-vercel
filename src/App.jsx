@@ -1639,13 +1639,18 @@ const CustomerStock = ({ user }) => {
     useEffect(() => {
         if (isAdmin) {
             onSnapshot(collection(db, "customers"), snap => {
-                setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                const customerList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                setCustomers(customerList);
+                // Automatically select the first customer if none is selected
+                if (!selectedCustomer && customerList.length > 0) {
+                    setSelectedCustomer(customerList[0].id);
+                }
             });
             onSnapshot(collection(db, "stockSubCategories"), snap => {
                 setStockSubCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             });
         }
-    }, [isAdmin]);
+    }, [isAdmin, selectedCustomer]);
 
     useEffect(() => {
         if (!user) return;
@@ -1662,7 +1667,76 @@ const CustomerStock = ({ user }) => {
     }, [user, selectedCustomer, isAdmin]);
     
     const handleUpload = () => {
-        // ... handleUpload logic is unchanged ...
+        if (!selectedCustomer) {
+            setError("Please select a customer first.");
+            return;
+        }
+        if (!selectedFile) {
+            setError("Please select a file to upload.");
+            return;
+        }
+        if (!XLSX) {
+            setError("The Excel parsing library is not ready. Please try again in a moment.");
+            return;
+        }
+
+        setLoading(true);
+        setError("");
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet);
+
+                if (json.length === 0) {
+                    setError("The selected Excel file is empty.");
+                    return;
+                }
+
+                // Check for required headers
+                const requiredHeaders = ['PART_NO', 'DESCRIPTION', 'TOTAL_QTY'];
+                const firstRow = json[0];
+                for (const header of requiredHeaders) {
+                    if (!(header in firstRow)) {
+                        throw new Error(`Missing required column header: ${header}`);
+                    }
+                }
+
+                const batch = writeBatch(db);
+                const collectionRef = collection(db, "stock", selectedCustomer, "items");
+
+                json.forEach((row) => {
+                    const partNo = String(row.PART_NO).trim();
+                    if (partNo) { // Ensure part number is not empty
+                        const docRef = doc(collectionRef, partNo); // Use PART_NO as the document ID
+                        batch.set(docRef, {
+                            PART_NO: partNo,
+                            DESCRIPTION: row.DESCRIPTION || '',
+                            TOTAL_QTY: row.TOTAL_QTY || 0,
+                            category: 'Unassigned' // Default category
+                        });
+                    }
+                });
+
+                await batch.commit();
+                alert(`Successfully uploaded ${json.length} stock items for the selected customer.`);
+                setSelectedFile(null);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                }
+
+            } catch (err) {
+                console.error("Error processing file: ", err);
+                setError(`Failed to process file. ${err.message}`);
+            } finally {
+                setLoading(false);
+            }
+        };
+        reader.readAsArrayBuffer(selectedFile);
     };
 
     const groupedAndFilteredItems = useMemo(() => {
@@ -1727,7 +1801,39 @@ const CustomerStock = ({ user }) => {
             <div className="card-body">
                  {isAdmin && (
                     <div className="mb-4 p-3 border rounded bg-body-tertiary">
-                        {/* ... admin upload panel is unchanged ... */}
+                         <h3 className="h5 mb-3">Admin: Upload Stock Data</h3>
+                        {error && <div className="alert alert-danger">{error}</div>}
+                        <div className="row g-3 align-items-end">
+                            <div className="col-md-4">
+                                <label htmlFor="customer-select" className="form-label">Select Customer</label>
+                                <select 
+                                    id="customer-select" 
+                                    className="form-select" 
+                                    value={selectedCustomer} 
+                                    onChange={e => setSelectedCustomer(e.target.value)}
+                                >
+                                    <option value="">Choose a customer...</option>
+                                    {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
+                                </select>
+                            </div>
+                             <div className="col-md-5">
+                                <label htmlFor="stock-file-upload" className="form-label">Upload Excel File</label>
+                                <input 
+                                    type="file" 
+                                    id="stock-file-upload"
+                                    className="form-control"
+                                    ref={fileInputRef}
+                                    onChange={e => setSelectedFile(e.target.files[0])}
+                                    accept=".xlsx, .xls"
+                                />
+                                <div className="form-text">File must contain columns: PART_NO, DESCRIPTION, TOTAL_QTY.</div>
+                            </div>
+                            <div className="col-md-3">
+                                <button onClick={handleUpload} className="btn btn-primary w-100" disabled={loading || !selectedCustomer || !selectedFile}>
+                                    {loading ? 'Uploading...' : 'Upload Stock'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
                 
