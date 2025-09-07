@@ -524,17 +524,82 @@ const ContactPage = () => (
 );
 
 // --- DASHBOARD / INTERNAL APP COMPONENTS ---
-
-// ... (Rest of the components like DashboardHeader, Dashboard, etc., would go here)
-// For brevity, I will only include the components we have recently modified: NewOrderForm and OrderList.
-// All other components from the previous full code block should be placed after these.
-
 const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
-    // ... This component's code remains the same ...
+    const isAdmin = user.role === 'super_admin';
+    const isProduction = user.role === 'production';
+    const isCustomer = user.role === 'customer';
+
+    return (
+        <nav className="navbar navbar-expand bg-body-tertiary border-bottom shadow-sm">
+            <div className="container-fluid">
+                <div className="d-flex align-items-center">
+                    <a className="navbar-brand" href="#" onClick={(e) => { e.preventDefault(); onNavigate('dashboard'); }}>
+                        <img src={settings.logoUrl || 'https://i.imgur.com/cAyxfn7.png'} alt="Logo" style={{height: '32px'}}/>
+                    </a>
+                    <ul className="navbar-nav d-flex flex-row">
+                        {!isCustomer && (
+                             <>
+                                <li className="nav-item">
+                                    <a className="nav-link" href="#" onClick={(e) => { e.preventDefault(); onNavigate('new-order'); }}>New Order</a>
+                                </li>
+                                <li className="nav-item ms-3">
+                                    <a className="nav-link" href="#" onClick={(e) => { e.preventDefault(); onNavigate('order-list'); }}>Order List</a>
+                                </li>
+                                <li className="nav-item ms-3">
+                                    <a className="nav-link" href="#" onClick={(e) => { e.preventDefault(); onNavigate('planning'); }}>Production Schedule</a>
+                                </li>
+                             </>
+                        )}
+                        {isCustomer && (
+                            <>
+                                <li className="nav-item ms-3">
+                                    <a className="nav-link" href="#" onClick={(e) => { e.preventDefault(); onNavigate('order-list'); }}>My Orders</a>
+                                </li>
+                                <li className="nav-item ms-3">
+                                    <a className="nav-link" href="#" onClick={(e) => { e.preventDefault(); onNavigate('planning'); }}>Production Status</a>
+                                </li>
+                            </>
+                        )}
+                    </ul>
+                </div>
+                
+                <div className="d-flex align-items-center ms-auto">
+                    <div className="dropdown">
+                        <button className="btn btn-light d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                           <div className="text-end me-2">
+                                <div className="fw-semibold" style={{lineHeight: 1}}>{user.name}</div>
+                                <small className="text-muted text-capitalize" style={{fontSize: '0.8em'}}>{user.role.replace('_', ' ')}</small>
+                            </div>
+                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-person-circle" viewBox="0 0 16 16">
+                              <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                              <path fillRule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
+                            </svg>
+                        </button>
+                        <ul className="dropdown-menu dropdown-menu-end">
+                            <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('dashboard'); }}>Dashboard</a></li>
+                            {isCustomer && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('order-list'); }}>My Orders</a></li>}
+                            {isCustomer && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('planning'); }}>Production Status</a></li>}
+                            <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('stock'); }}>My Stock</a></li>
+                            
+                            {(isAdmin || isProduction) && <li><hr className="dropdown-divider" /></li>}
+                            {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('order-list'); }}>Order List</a></li>}
+                            {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('planning'); }}>Production Schedule</a></li>}
+                            
+                            {isAdmin && <li><hr className="dropdown-divider" /></li>}
+                            {isAdmin && <li><a className="dropdown-item fw-bold" href="#" onClick={(e) => { e.preventDefault(); onNavigate('admin'); }}>Admin Panel</a></li>}
+                            {isAdmin && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('settings'); }}>Settings</a></li>}
+                            
+                            <li><hr className="dropdown-divider" /></li>
+                            <li><a className="dropdown-item text-danger" href="#" onClick={(e) => { e.preventDefault(); onSignOut(); }}>Sign Out</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    );
 };
 
 const Dashboard = ({ user }) => {
-    // ... This component's code is now updated to remove the welcome message ...
     const [weeklyOrders, setWeeklyOrders] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const currentWeek = useMemo(() => getCurrentWeekString(), []);
@@ -616,45 +681,81 @@ const Dashboard = ({ user }) => {
 };
 
 const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
+    // State for data fetched from Firestore
     const [orderTypes, setOrderTypes] = useState([]);
     const [products, setProducts] = useState([]);
     const [customers, setCustomers] = useState([]);
-    const [selectedOrderType, setSelectedOrderType] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
     
+    // State for form inputs
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [selectedOrderType, setSelectedOrderType] = useState('');
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [material, setMaterial] = useState('');
+    const [ifsOrderNo, setIfsOrderNo] = useState('');
+    const [customerPO, setCustomerPO] = useState('');
+    const [size, setSize] = useState('');
+    const [quantity, setQuantity] = useState(1);
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Fetch initial data for dropdowns
     useEffect(() => {
-        const unsubOrderTypes = onSnapshot(collection(db, "orderTypes"), (snap) => {
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-            setOrderTypes(list);
+        const unsubOrderTypes = onSnapshot(collection(db, "orderTypes"), snap => {
+            setOrderTypes(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "")));
         });
-
-        const unsubProducts = onSnapshot(collection(db, "products"), (snap) => {
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-            setProducts(list);
+        const unsubProducts = onSnapshot(collection(db, "products"), snap => {
+            setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "")));
         });
-        
-        const unsubCustomers = onSnapshot(collection(db, "customers"), (snap) => {
-            const customerList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            customerList.sort((a, b) => (a.companyName || "").localeCompare(b.companyName || ""));
-            setCustomers(customerList);
+        const unsubCustomers = onSnapshot(collection(db, "customers"), snap => {
+            setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.companyName || "").localeCompare(b.companyName || "")));
         });
-
         return () => { unsubOrderTypes(); unsubProducts(); unsubCustomers(); };
     }, []);
 
+    // Memoized options for react-select components
+    const customerOptions = useMemo(() => customers.map(c => ({ value: c.id, label: c.companyName })), [customers]);
+    
     const filteredProducts = useMemo(() => {
         if (!selectedOrderType) return [];
         return products.filter(p => p.orderTypeId === selectedOrderType);
     }, [selectedOrderType, products]);
 
+    const productOptions = useMemo(() => filteredProducts.map(p => ({ value: p.id, label: p.name })), [filteredProducts]);
+
+    const handleOrderTypeChange = (e) => {
+        setSelectedOrderType(e.target.value);
+        setSelectedProduct(null); // Reset product selection when order type changes
+    };
+    
+    const resetForm = () => {
+        setSelectedCustomer(null);
+        setSelectedOrderType('');
+        setSelectedProduct(null);
+        setMaterial('');
+        setIfsOrderNo('');
+        setCustomerPO('');
+        setSize('');
+        setQuantity(1);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!selectedCustomer || !selectedProduct || !selectedOrderType) {
+            alert("Please select a customer, order type, and product.");
+            return;
+        }
         setIsSubmitting(true);
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-        data.quantity = Number(data.quantity);
+        
+        const data = {
+            customerId: selectedCustomer.value,
+            orderTypeId: selectedOrderType,
+            productId: selectedProduct.value,
+            material,
+            ifsOrderNo,
+            customerPO,
+            size,
+            quantity: Number(quantity)
+        };
         
         try {
             const newOrderNumber = await runTransaction(db, async (transaction) => {
@@ -670,14 +771,13 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
                 const orderNumberDisplay = data.quantity === 1 ? `${prefix}${lastNumber + 1}` : `${prefix}${lastNumber + 1}-${prefix}${lastNumber + data.quantity}`;
                 transaction.update(settingsRef, { [lastNumberField]: lastNumber + data.quantity });
                 
-                const customer = customers.find(c => c.id === data.customerId);
-                const product = products.find(p => p.id === data.productId);
+                const productDoc = products.find(p => p.id === data.productId);
 
                 addDoc(collection(db, 'orders'), { 
                     ...data, 
                     aquaOrderNumber: orderNumberDisplay, 
-                    customerCompanyName: customer?.companyName || 'N/A', 
-                    productName: product?.name || 'N/A',
+                    customerCompanyName: selectedCustomer.label, 
+                    productName: productDoc?.name || 'N/A',
                     orderTypeName: orderTypeDoc?.name || 'N/A',
                     createdAt: serverTimestamp(), 
                     createdBy: user.name,
@@ -686,11 +786,9 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
                 return orderNumberDisplay;
             });
             onOrderCreated(newOrderNumber);
-            e.target.reset(); 
-            setSelectedOrderType('');
+            resetForm();
         } catch (error) {
             console.error("Transaction failed: ", error);
-            // You could add a user-facing error message here
         } finally {
             setIsSubmitting(false);
         }
@@ -708,30 +806,41 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
                             <div className="row g-3">
                                 <div className="col-md-4">
                                     <label htmlFor="customerId" className="form-label">Customer</label>
-                                    <select id="customerId" name="customerId" className="form-select" required>
-                                        <option value="">Choose...</option>
-                                    {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
-                                    </select>
+                                    <Select
+                                        id="customerId"
+                                        options={customerOptions}
+                                        value={selectedCustomer}
+                                        onChange={setSelectedCustomer}
+                                        placeholder="Search and select a customer..."
+                                        isClearable
+                                        required
+                                    />
                                 </div>
                                 <div className="col-md-4">
                                     <label htmlFor="orderTypeId" className="form-label">Order Type</label>
-                                    <select id="orderTypeId" name="orderTypeId" className="form-select" required onChange={(e) => setSelectedOrderType(e.target.value)}>
+                                    <select id="orderTypeId" value={selectedOrderType} className="form-select" required onChange={handleOrderTypeChange}>
                                         <option value="">Choose...</option>
                                         {orderTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="col-md-4">
-                                <label htmlFor="productId" className="form-label">Product</label>
-                                    <select id="productId" name="productId" className="form-select" required disabled={!selectedOrderType}>
-                                    <option value="">Choose...</option>
-                                    {filteredProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                    </select>
+                                    <label htmlFor="productId" className="form-label">Product</label>
+                                    <Select
+                                        id="productId"
+                                        options={productOptions}
+                                        value={selectedProduct}
+                                        onChange={setSelectedProduct}
+                                        placeholder="Search and select a product..."
+                                        isClearable
+                                        required
+                                        isDisabled={!selectedOrderType}
+                                    />
                                 </div>
-                                <div className="col-md-4"><label htmlFor="material" className="form-label">Material</label><input type="text" id="material" name="material" className="form-control" /></div>
-                                <div className="col-md-4"><label htmlFor="ifsOrderNo" className="form-label">IFS Order No</label><input type="text" id="ifsOrderNo" name="ifsOrderNo" className="form-control" /></div>
-                                <div className="col-md-4"><label htmlFor="customerPO" className="form-label">Customer PO</label><input type="text" id="customerPO" name="customerPO" className="form-control" /></div>
-                                <div className="col-md-8"><label htmlFor="size" className="form-label">Size</label><input type="text" id="size" name="size" className="form-control" /></div>
-                                <div className="col-md-4"><label htmlFor="quantity" className="form-label">Quantity</label><input type="number" id="quantity" name="quantity" className="form-control" defaultValue="1" min="1" required /></div>
+                                <div className="col-md-4"><label htmlFor="material" className="form-label">Material</label><input type="text" id="material" value={material} onChange={e => setMaterial(e.target.value)} className="form-control" /></div>
+                                <div className="col-md-4"><label htmlFor="ifsOrderNo" className="form-label">IFS Order No</label><input type="text" id="ifsOrderNo" value={ifsOrderNo} onChange={e => setIfsOrderNo(e.target.value)} className="form-control" /></div>
+                                <div className="col-md-4"><label htmlFor="customerPO" className="form-label">Customer PO</label><input type="text" id="customerPO" value={customerPO} onChange={e => setCustomerPO(e.target.value)} className="form-control" /></div>
+                                <div className="col-md-8"><label htmlFor="size" className="form-label">Size</label><input type="text" id="size" value={size} onChange={e => setSize(e.target.value)} className="form-control" /></div>
+                                <div className="col-md-4"><label htmlFor="quantity" className="form-label">Quantity</label><input type="number" id="quantity" value={quantity} onChange={e => setQuantity(e.target.value)} className="form-control" min="1" required /></div>
                             </div>
                             <div className="text-end mt-4">
                                 <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
@@ -742,7 +851,6 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
                     </div>
                 </div>
 
-                {/* New container for the generated order number */}
                 {lastGeneratedOrderNumber && (
                     <div className="card w-100 mt-4 text-center">
                         <div className="card-body">
@@ -756,6 +864,7 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
         </div>
     );
 };
+
 
 const QcModal = ({ order, user, onClose }) => {
     const [photos, setPhotos] = useState([]);
