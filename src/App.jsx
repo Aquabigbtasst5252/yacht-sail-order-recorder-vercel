@@ -302,7 +302,7 @@ const HomePage = ({ onLoginSuccess, settings }) => {
                 await updateProfile(userCredential.user, { displayName: username });
             }
             onLoginSuccess();
-        } catch (err) {
+        } catch (err) => {
             setError(err.message);
         } finally {
             setLoading(false);
@@ -1633,6 +1633,7 @@ const CustomerStock = ({ user }) => {
     const [selectedCustomer, setSelectedCustomer] = useState('');
     const [selectedFile, setSelectedFile] = useState(null);
     const [stockSubCategories, setStockSubCategories] = useState([]);
+    const [lastUploadDate, setLastUploadDate] = useState(null);
     const fileInputRef = useRef(null);
     const isAdmin = user.role === 'super_admin' || user.role === 'production';
 
@@ -1641,7 +1642,6 @@ const CustomerStock = ({ user }) => {
             onSnapshot(collection(db, "customers"), snap => {
                 const customerList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 setCustomers(customerList);
-                // Automatically select the first customer if none is selected
                 if (!selectedCustomer && customerList.length > 0) {
                     setSelectedCustomer(customerList[0].id);
                 }
@@ -1650,7 +1650,16 @@ const CustomerStock = ({ user }) => {
                 setStockSubCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             });
         }
-    }, [isAdmin, selectedCustomer]);
+    }, [isAdmin]);
+    
+    useEffect(() => {
+        const customerData = customers.find(c => c.id === selectedCustomer);
+        if (customerData && customerData.lastStockUpdate) {
+            setLastUploadDate(customerData.lastStockUpdate.toDate().toLocaleDateString());
+        } else {
+            setLastUploadDate(null);
+        }
+    }, [selectedCustomer, customers]);
 
     useEffect(() => {
         if (!user) return;
@@ -1666,7 +1675,7 @@ const CustomerStock = ({ user }) => {
         return () => unsub();
     }, [user, selectedCustomer, isAdmin]);
     
-    const handleUpload = () => {
+    const handleUpload = async () => {
         if (!selectedCustomer) {
             setError("Please select a customer first.");
             return;
@@ -1697,7 +1706,6 @@ const CustomerStock = ({ user }) => {
                     return;
                 }
 
-                // Check for required headers
                 const requiredHeaders = ['PART_NO', 'DESCRIPTION', 'TOTAL_QTY'];
                 const firstRow = json[0];
                 for (const header of requiredHeaders) {
@@ -1711,16 +1719,20 @@ const CustomerStock = ({ user }) => {
 
                 json.forEach((row) => {
                     const partNo = String(row.PART_NO).trim();
-                    if (partNo) { // Ensure part number is not empty
-                        const docRef = doc(collectionRef, partNo); // Use PART_NO as the document ID
+                    if (partNo) {
+                        const docRef = doc(collectionRef, partNo);
                         batch.set(docRef, {
                             PART_NO: partNo,
                             DESCRIPTION: row.DESCRIPTION || '',
                             TOTAL_QTY: row.TOTAL_QTY || 0,
-                            category: 'Unassigned' // Default category
+                            category: 'Unassigned'
                         });
                     }
                 });
+                
+                // Also update the customer's lastStockUpdate timestamp
+                const customerDocRef = doc(db, "customers", selectedCustomer);
+                batch.update(customerDocRef, { lastStockUpdate: serverTimestamp() });
 
                 await batch.commit();
                 alert(`Successfully uploaded ${json.length} stock items for the selected customer.`);
@@ -1760,9 +1772,9 @@ const CustomerStock = ({ user }) => {
                 return acc;
             }
 
-            const mainCategory = subCategoryMap[category] || "Sail Materials"; // Default main category if not found
+            const mainCategory = subCategoryMap[category] || "Sail Materials";
             if (!acc[mainCategory]) {
-                acc[mainCategory] = {}; // Ensure main category exists
+                acc[mainCategory] = {};
             }
             if (!acc[mainCategory][category]) {
                 acc[mainCategory][category] = [];
@@ -1801,7 +1813,10 @@ const CustomerStock = ({ user }) => {
             <div className="card-body">
                  {isAdmin && (
                     <div className="mb-4 p-3 border rounded bg-body-tertiary">
-                         <h3 className="h5 mb-3">Admin: Upload Stock Data</h3>
+                         <h3 className="h5 mb-3">
+                            Admin: Upload Stock Data
+                            {lastUploadDate && <small className="text-muted fs-6 fw-normal ms-2">(Last Updated: {lastUploadDate})</small>}
+                        </h3>
                         {error && <div className="alert alert-danger">{error}</div>}
                         <div className="row g-3 align-items-end">
                             <div className="col-md-4">
@@ -1837,7 +1852,6 @@ const CustomerStock = ({ user }) => {
                     </div>
                 )}
                 
-                {/* --- NEW TABLE-BASED LAYOUT --- */}
                 <div className="table-responsive">
                     <table className="table table-sm table-hover table-bordered">
                         <thead>
@@ -1849,7 +1863,6 @@ const CustomerStock = ({ user }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {/* Render Unassigned items first */}
                             {groupedAndFilteredItems.unassigned.length > 0 && (
                                 <>
                                     <tr className="table-light"><th colSpan={isAdmin ? 4 : 3}>Unassigned</th></tr>
@@ -1864,7 +1877,6 @@ const CustomerStock = ({ user }) => {
                                 </>
                             )}
 
-                            {/* Render categorized items */}
                             {Object.entries({ "Sail Materials": groupedAndFilteredItems["Sail Materials"], "Sail Hardware": groupedAndFilteredItems["Sail Hardware"] }).map(([mainCategory, subCategories]) => (
                                 Object.keys(subCategories).length > 0 && (
                                     <React.Fragment key={mainCategory}>
@@ -1973,7 +1985,7 @@ const CustomerManagementTab = () => {
     };
     
     const handleDelete = async (id) => {
-        if (window.confirm("Are you sure you want to delete this customer?")) {
+        if (window.confirm("Are you sure you want to delete this customer? This action cannot be undone.")) {
             await deleteDoc(doc(db, "customers", id));
         }
     };
@@ -2006,6 +2018,7 @@ const CustomerManagementTab = () => {
                             <th>Company Name</th>
                             <th>Contact Name</th>
                             <th>Email</th>
+                            <th>Last Stock Update</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -2015,6 +2028,7 @@ const CustomerManagementTab = () => {
                                 <td>{c.companyName}</td>
                                 <td>{c.contactName}</td>
                                 <td>{c.email}</td>
+                                <td>{c.lastStockUpdate ? c.lastStockUpdate.toDate().toLocaleDateString() : 'N/A'}</td>
                                 <td>
                                     <button className="btn btn-sm btn-outline-primary me-2" onClick={() => setEditingCustomer(c)}>Edit</button>
                                     <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(c.id)}>Delete</button>
