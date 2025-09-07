@@ -302,7 +302,7 @@ const HomePage = ({ onLoginSuccess, settings }) => {
                 await updateProfile(userCredential.user, { displayName: username });
             }
             onLoginSuccess();
-        } catch (err) => {
+        } catch (err) {
             setError(err.message);
         } finally {
             setLoading(false);
@@ -1730,7 +1730,6 @@ const CustomerStock = ({ user }) => {
                     }
                 });
                 
-                // Also update the customer's lastStockUpdate timestamp
                 const customerDocRef = doc(db, "customers", selectedCustomer);
                 batch.update(customerDocRef, { lastStockUpdate: serverTimestamp() });
 
@@ -1832,7 +1831,10 @@ const CustomerStock = ({ user }) => {
                                 </select>
                             </div>
                              <div className="col-md-5">
-                                <label htmlFor="stock-file-upload" className="form-label">Upload Excel File</label>
+                                <label htmlFor="stock-file-upload" className="form-label">
+                                    Upload Excel File
+                                    <small className="text-muted fw-normal ms-2">(Columns: PART_NO, DESCRIPTION, TOTAL_QTY)</small>
+                                </label>
                                 <input 
                                     type="file" 
                                     id="stock-file-upload"
@@ -1841,7 +1843,6 @@ const CustomerStock = ({ user }) => {
                                     onChange={e => setSelectedFile(e.target.files[0])}
                                     accept=".xlsx, .xls"
                                 />
-                                <div className="form-text">File must contain columns: PART_NO, DESCRIPTION, TOTAL_QTY.</div>
                             </div>
                             <div className="col-md-3">
                                 <button onClick={handleUpload} className="btn btn-primary w-100" disabled={loading || !selectedCustomer || !selectedFile}>
@@ -1926,13 +1927,15 @@ const AdminPanel = () => {
 const UserManagementTab = () => {
     const [users, setUsers] = useState([]);
     const [customers, setCustomers] = useState([]);
+    const [editingUserId, setEditingUserId] = useState(null);
+    const [editName, setEditName] = useState('');
     
     useEffect(() => { 
         onSnapshot(collection(db, "users"), (snapshot) => setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
         onSnapshot(collection(db, "customers"), (snapshot) => setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     }, []);
 
-    const handleUpdate = async (id, field, value) => {
+    const handleUpdateField = async (id, field, value) => {
         const updateData = { [field]: value };
         if (field === 'customerCompanyId') {
             const selectedCustomer = customers.find(c => c.id === value);
@@ -1941,28 +1944,106 @@ const UserManagementTab = () => {
         await updateDoc(doc(db, "users", id), updateData);
     };
 
+    const handleEditClick = (user) => {
+        setEditingUserId(user.id);
+        setEditName(user.name);
+    };
+
+    const handleCancelClick = () => {
+        setEditingUserId(null);
+        setEditName('');
+    };
+
+    const handleSaveClick = async () => {
+        if (!editName.trim()) {
+            alert("Name cannot be empty.");
+            return;
+        }
+        await updateDoc(doc(db, "users", editingUserId), { name: editName });
+        setEditingUserId(null);
+        setEditName('');
+    };
+
     return (
         <div>
             <h3 className="h5 mb-3">Manage User Roles and Status</h3>
-            <div className="table-responsive"><table className="table">
-                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Assign Customer</th></tr></thead>
-                <tbody>{users.map(u => (
-                    <tr key={u.id}>
-                        <td>{u.name}</td>
-                        <td>{u.email}</td>
-                        <td><select className="form-select form-select-sm" value={u.role} onChange={e => handleUpdate(u.id, 'role', e.target.value)}><option value="customer">Customer</option><option value="production">Production</option><option value="super_admin">Super Admin</option></select></td>
-                        <td><select className="form-select form-select-sm" value={u.status} onChange={e => handleUpdate(u.id, 'status', e.target.value)}><option value="pending">Pending</option><option value="active">Active</option></select></td>
-                        <td>
-                            {u.role === 'customer' && (
-                                <select className="form-select form-select-sm" value={u.customerCompanyId || ''} onChange={e => handleUpdate(u.id, 'customerCompanyId', e.target.value)}>
-                                    <option value="">Not Assigned</option>
-                                    {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
+            <div className="table-responsive">
+                <table className="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Assign Customer</th>
+                            <th style={{width: "150px"}}>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>{users.map(u => (
+                        <tr key={u.id}>
+                            <td>
+                                {editingUserId === u.id ? (
+                                    <input
+                                        type="text"
+                                        className="form-control form-control-sm"
+                                        value={editName}
+                                        onChange={(e) => setEditName(e.target.value)}
+                                    />
+                                ) : (
+                                    u.name
+                                )}
+                            </td>
+                            <td>{u.email}</td>
+                            <td>
+                                <select 
+                                    className="form-select form-select-sm" 
+                                    value={u.role} 
+                                    onChange={e => handleUpdateField(u.id, 'role', e.target.value)}
+                                    disabled={editingUserId === u.id}
+                                >
+                                    <option value="customer">Customer</option>
+                                    <option value="production">Production</option>
+                                    <option value="super_admin">Super Admin</option>
                                 </select>
-                            )}
-                        </td>
-                    </tr>
-                ))}</tbody>
-            </table></div>
+                            </td>
+                            <td>
+                                <select 
+                                    className="form-select form-select-sm" 
+                                    value={u.status} 
+                                    onChange={e => handleUpdateField(u.id, 'status', e.target.value)}
+                                    disabled={editingUserId === u.id}
+                                >
+                                    <option value="pending">Pending</option>
+                                    <option value="active">Active</option>
+                                </select>
+                            </td>
+                            <td>
+                                {u.role === 'customer' && (
+                                    <select 
+                                        className="form-select form-select-sm" 
+                                        value={u.customerCompanyId || ''} 
+                                        onChange={e => handleUpdateField(u.id, 'customerCompanyId', e.target.value)}
+                                        disabled={editingUserId === u.id}
+                                    >
+                                        <option value="">Not Assigned</option>
+                                        {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
+                                    </select>
+                                )}
+                            </td>
+                             <td>
+                                {editingUserId === u.id ? (
+                                    <>
+                                        <button className="btn btn-sm btn-success me-2" onClick={handleSaveClick}>Save</button>
+                                        <button className="btn btn-sm btn-secondary" onClick={handleCancelClick}>Cancel</button>
+                                    </>
+                                ) : (
+                                    <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditClick(u)}>Edit Name</button>
+                                )}
+                            </td>
+                        </tr>
+                    ))}</tbody>
+                </table>
+            </div>
         </div>
     );
 };
