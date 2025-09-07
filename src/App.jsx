@@ -599,14 +599,6 @@ const Dashboard = ({ user }) => {
 
     return (
         <div className="container-fluid">
-            <div className="card mb-4">
-                <div className="card-body">
-                    <h1 className="card-title h4">Dashboard</h1>
-                    <p className="card-text mb-1">Welcome back, {user.name}!</p>
-                    {user.role === 'customer' && <p className="card-text text-muted">You are assigned to: <strong>{user.customerCompanyName}</strong></p>}
-                </div>
-            </div>
-
             <div className="card">
                 <div className="card-header">
                     <h2 className="h5 mb-0">This Week's Production Schedule ({currentWeek})</h2>
