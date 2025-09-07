@@ -1,3 +1,7 @@
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import Select from 'react-select';
+
+// --- Firebase SDK Imports ---
 import { initializeApp } from "firebase/app";
 import { 
     getAuth, 
@@ -224,6 +228,7 @@ export default function App() {
 }
 
 // --- Screens & Major Components ---
+// All component definitions must come before the App component uses them.
 
 const PendingAccessScreen = ({ message, companyName, logoUrl }) => (
     <div className="d-flex align-items-center justify-content-center vh-100 bg-body-tertiary">
@@ -237,7 +242,6 @@ const PendingAccessScreen = ({ message, companyName, logoUrl }) => (
     </div>
 );
 
-// --- NEW PUBLIC WEBSITE COMPONENTS ---
 const PublicHeader = ({ onNavigate, settings }) => (
     <nav className="navbar navbar-expand-lg bg-body-tertiary border-bottom shadow-sm sticky-top">
         <div className="container">
@@ -435,9 +439,11 @@ const AboutPage = () => (
     </div>
 );
 
-const ServicesPage = () => {
-    // ... Services Page content ...
-};
+const ServicesPage = () => (
+    <div className="py-5 bg-body-tertiary rounded-3">
+        {/* ... Services Page content ... */}
+    </div>
+);
 
 const ContactPage = () => (
     <div className="py-5 bg-body-tertiary rounded-3">
@@ -786,6 +792,7 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
         </div>
     );
 };
+
 
 const QcModal = ({ order, user, onClose }) => {
     const [photos, setPhotos] = useState([]);
