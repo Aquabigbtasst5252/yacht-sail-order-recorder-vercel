@@ -945,13 +945,13 @@ const QcModal = ({ order, user, onClose }) => {
     );
 };
 
-
 const OrderList = ({ user }) => {
     const [orders, setOrders] = useState([]);
     const [editingOrder, setEditingOrder] = useState(null);
-    const [qcOrder, setQcOrder] = useState(null); // State for QC modal
+    const [qcOrder, setQcOrder] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeTab, setActiveTab] = useState('all'); // 'all', 'sails', or 'accessories'
     const entriesPerPage = 25;
     const isCustomer = user.role === 'customer';
 
@@ -968,15 +968,32 @@ const OrderList = ({ user }) => {
         return () => unsub();
     }, [user]);
 
+    // Reset to the first page when the filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab, searchTerm]);
+    
+    // 1. First, filter by the active tab
+    const categorizedOrders = useMemo(() => {
+        if (activeTab === 'sails') {
+            return orders.filter(order => order.orderTypeName?.toLowerCase() === 'sail');
+        }
+        if (activeTab === 'accessories') {
+            return orders.filter(order => order.orderTypeName?.toLowerCase() !== 'sail');
+        }
+        return orders; // 'all' tab
+    }, [orders, activeTab]);
+
+    // 2. Then, filter by the search term
     const filteredOrders = useMemo(() => {
-        if (!searchTerm) return orders;
+        if (!searchTerm) return categorizedOrders;
         const lowercasedFilter = searchTerm.toLowerCase();
-        return orders.filter(order =>
+        return categorizedOrders.filter(order =>
             Object.values(order).some(value =>
                 String(value).toLowerCase().includes(lowercasedFilter)
             )
         );
-    }, [orders, searchTerm]);
+    }, [categorizedOrders, searchTerm]);
 
     const handleDelete = async (id) => {
         if(window.confirm("Are you sure you want to delete this order?")) {
@@ -1011,12 +1028,22 @@ const OrderList = ({ user }) => {
     return (
         <div className="card w-100">
             <div className="card-header d-flex justify-content-between align-items-center">
-                <h2 className="h4 mb-0">Order List</h2>
+                <ul className="nav nav-tabs card-header-tabs">
+                    <li className="nav-item">
+                        <button className={`nav-link ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>All Orders</button>
+                    </li>
+                    <li className="nav-item">
+                        <button className={`nav-link ${activeTab === 'sails' ? 'active' : ''}`} onClick={() => setActiveTab('sails')}>Sails</button>
+                    </li>
+                    <li className="nav-item">
+                        <button className={`nav-link ${activeTab === 'accessories' ? 'active' : ''}`} onClick={() => setActiveTab('accessories')}>Accessories</button>
+                    </li>
+                </ul>
                  <div className="col-md-4">
                     <input
                         type="text"
                         className="form-control"
-                        placeholder="Search orders..."
+                        placeholder={`Search in ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}...`}
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
