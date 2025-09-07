@@ -1763,7 +1763,6 @@ const CustomerStock = ({ user }) => {
 };
 
 
-
 const AdminPanel = () => {
     const [activeTab, setActiveTab] = useState('users');
     return (
