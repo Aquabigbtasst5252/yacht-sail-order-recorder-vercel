@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Select from 'react-select';
+import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+
 
 // --- Firebase SDK Imports ---
 import { initializeApp } from "firebase/app";
@@ -72,6 +74,18 @@ const getCurrentWeekString = () => {
     return `${year}-W${String(weekNumber).padStart(2, '0')}`;
 };
 
+const getWeekStringFromDate = (dateString) => {
+    if (!dateString) return '';
+    // Create date in UTC to avoid timezone issues
+    const date = new Date(dateString + 'T00:00:00Z');
+    const year = date.getUTCFullYear();
+    const firstDayOfYear = new Date(Date.UTC(year, 0, 1));
+    const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+    const weekNumber = Math.ceil((pastDaysOfYear + firstDayOfYear.getUTCDay() + 1) / 7);
+    return `${year}-W${String(weekNumber).padStart(2, '0')}`;
+};
+
+
 const loadScript = (src) => {
     return new Promise((resolve, reject) => {
         if (document.querySelector(`script[src="${src}"]`)) {
@@ -110,14 +124,6 @@ export default function App() {
             })
             .catch(err => console.error("Failed to load XLSX script:", err));
         
-        // Load PDF generation libraries
-        loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js")
-            .then(() => {
-                // Chain load autotable plugin after jspdf is loaded
-                return loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js");
-            })
-            .catch(err => console.error("Failed to load PDF generation scripts:", err));
-
         const applyTheme = () => {
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                 document.documentElement.setAttribute('data-bs-theme', 'dark');
@@ -1202,6 +1208,7 @@ const WeeklyScheduleView = ({ user }) => {
     const [selectedWeek, setSelectedWeek] = useState('');
     const [stoppingOrder, setStoppingOrder] = useState(null);
     const [stopReason, setStopReason] = useState('');
+    const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
     const isCustomer = user.role === 'customer';
 
     useEffect(() => {
@@ -1287,49 +1294,18 @@ const WeeklyScheduleView = ({ user }) => {
         );
     };
     
-    const handleExportPDF = () => {
-        if (!selectedWeek) {
-            alert("Please select a week to export.");
-            return;
-        }
-        if (typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF.prototype.autoTable !== 'function') {
-            alert("PDF generation library is still loading. Please try again in a moment.");
-            return;
-        }
-
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        
-        doc.text(`${selectedWeek} - Yacht Sail Production Schedule`, 14, 15);
-        
-        const tableData = [];
-        Object.keys(ordersByCustomer).sort().forEach(customerName => {
-            tableData.push([{ content: customerName, colSpan: 6, styles: { fontStyle: 'bold', fillColor: '#f0f0f0' } }]);
-            ordersByCustomer[customerName].forEach(order => {
-                tableData.push([
-                    order.aquaOrderNumber || '',
-                    order.customerPO || '',
-                    order.ifsOrderNo || '',
-                    `${order.productName || ''} - ${order.material || ''} - ${order.size || ''}`,
-                    order.quantity || '',
-                    order.deliveryDate || ''
-                ]);
-            });
-        });
-
-        doc.autoTable({
-            head: [['Aqua Order #', 'Customer PO', 'IFS Order #', 'Order Description', 'Qty', 'Delivery Date']],
-            body: tableData,
-            startY: 20,
-        });
-
-        doc.save(`production_schedule_${selectedWeek}.pdf`);
-    };
-
     return (
         <div>
             <div className="d-flex justify-content-between align-items-center mb-3">
-                 <button className="btn btn-secondary" onClick={handleExportPDF} disabled={!selectedWeek || isCustomer}>Export to PDF</button>
+                {!isCustomer && (
+                    <PDFDownloadLink
+                        document={<SchedulePDFDocument ordersByCustomer={ordersByCustomer} selectedWeek={selectedWeek} />}
+                        fileName={`production_schedule_${selectedWeek || 'all'}.pdf`}
+                        className={`btn btn-secondary ${!selectedWeek ? 'disabled' : ''}`}
+                    >
+                        {({ loading }) => (loading ? 'Loading document...' : 'Export to PDF')}
+                    </PDFDownloadLink>
+                )}
                 <div className="col-md-4">
                     <select className="form-select" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
                         <option value="">Select Delivery Week...</option>
@@ -1359,7 +1335,11 @@ const WeeklyScheduleView = ({ user }) => {
                                     </tr>
                                     {ordersByCustomer[customerName].map(order => (
                                         <tr key={order.id}>
-                                            <td>{order.aquaOrderNumber}</td>
+                                            <td>
+                                                <a href="#" onClick={(e) => { e.preventDefault(); setViewingHistoryFor(order); }}>
+                                                    {order.aquaOrderNumber}
+                                                </a>
+                                            </td>
                                             <td>{order.customerPO}</td>
                                             <td>{order.ifsOrderNo}</td>
                                             <td>{`${order.productName} - ${order.material} - ${order.size}`}</td>
@@ -1411,6 +1391,13 @@ const WeeklyScheduleView = ({ user }) => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {viewingHistoryFor && (
+                <OrderHistoryModal 
+                    order={viewingHistoryFor}
+                    onClose={() => setViewingHistoryFor(null)}
+                />
             )}
         </div>
     );
@@ -1513,9 +1500,13 @@ const AllActiveOrdersView = ({ user }) => {
         return () => unsub();
     }, [user]);
 
-    const handleDateUpdate = async (orderId, field, value) => {
-        if(isCustomer) return;
-        await updateDoc(doc(db, "orders", orderId), { [field]: value });
+    const handleDateChange = async (orderId, newDate) => {
+        if(isCustomer || !newDate) return;
+        const newWeek = getWeekStringFromDate(newDate);
+        await updateDoc(doc(db, "orders", orderId), { 
+            deliveryDate: newDate,
+            deliveryWeek: newWeek
+        });
     };
 
     const groupedAndFilteredOrders = useMemo(() => {
@@ -1567,13 +1558,12 @@ const AllActiveOrdersView = ({ user }) => {
                             <th>IFS Order #</th>
                             <th>Order Description</th>
                             <th>Qty</th>
-                            <th style={{width: '150px'}}>Delivery Week</th>
-                            <th style={{width: '170px'}}>Delivery Date</th>
+                            <th style={{width: '200px'}}>Delivery Date (sets week)</th>
                         </tr>
                     </thead>
                     {Object.keys(groupedAndFilteredOrders).sort().map(customerName => (
                         <tbody key={customerName}>
-                            <tr className="table-light"><th colSpan="7" className="ps-2">{customerName}</th></tr>
+                            <tr className="table-light"><th colSpan="6" className="ps-2">{customerName}</th></tr>
                             {groupedAndFilteredOrders[customerName].map(order => (
                                 <tr key={order.id}>
                                     <td>{order.aquaOrderNumber}</td>
@@ -1581,8 +1571,15 @@ const AllActiveOrdersView = ({ user }) => {
                                     <td>{order.ifsOrderNo}</td>
                                     <td>{`${order.productName} - ${order.material} - ${order.size}`}</td>
                                     <td>{order.quantity}</td>
-                                    <td><input type="week" defaultValue={order.deliveryWeek || ''} onBlur={(e) => handleDateUpdate(order.id, 'deliveryWeek', e.target.value)} className="form-control form-control-sm" disabled={isCustomer} /></td>
-                                    <td><input type="date" defaultValue={order.deliveryDate || ''} onBlur={(e) => handleDateUpdate(order.id, 'deliveryDate', e.target.value)} className="form-control form-control-sm" disabled={isCustomer} /></td>
+                                    <td>
+                                        <input 
+                                            type="date" 
+                                            defaultValue={order.deliveryDate || ''} 
+                                            onChange={(e) => handleDateChange(order.id, e.target.value)} 
+                                            className="form-control form-control-sm" 
+                                            disabled={isCustomer} 
+                                        />
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -2729,5 +2726,165 @@ const SettingsPage = () => {
                  <div className="text-end mt-4"><button onClick={handleSave} className="btn btn-primary">Save Settings</button></div>
             </div>
         </div>
+    );
+};
+
+
+// --- Helper Component for Order History Modal ---
+const OrderHistoryModal = ({ order, onClose }) => {
+    const [history, setHistory] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const historyQuery = query(collection(db, "orders", order.id, "statusHistory"), orderBy("timestamp", "desc"));
+        const unsubscribe = onSnapshot(historyQuery, (historySnap) => {
+            setHistory(historySnap.docs.map(d => d.data()));
+            setIsLoading(false);
+        });
+        return () => unsubscribe();
+    }, [order.id]);
+
+    return (
+        <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }} tabIndex="-1">
+            <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div className="modal-content">
+                    <div className="modal-header">
+                        <h5 className="modal-title">History for Order: {order.aquaOrderNumber}</h5>
+                        <button type="button" className="btn-close" onClick={onClose}></button>
+                    </div>
+                    <div className="modal-body">
+                        <p><strong>Customer:</strong> {order.customerCompanyName}</p>
+                        <p><strong>Product:</strong> {`${order.productName} - ${order.material} - ${order.size}`}</p>
+                        {isLoading ? (
+                             <div className="text-center"><div className="spinner-border" role="status"></div></div>
+                        ) : history.length === 0 ? (
+                            <p className="text-muted">No status history found for this order.</p>
+                        ) : (
+                            <table className="table table-striped table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Updated By</th>
+                                        <th>Date & Time</th>
+                                        <th>Reason for Stop</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {history.map((h, i) => (
+                                        <tr key={i}>
+                                            <td>{h.status}</td>
+                                            <td>{h.changedBy}</td>
+                                            <td>{h.timestamp?.toDate().toLocaleString() || '...'}</td>
+                                            <td>{h.reason || 'N/A'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                    <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Helper Component for PDF Document Generation ---
+const SchedulePDFDocument = ({ ordersByCustomer, selectedWeek }) => {
+    const styles = StyleSheet.create({
+        page: {
+            padding: 30,
+            fontSize: 10,
+            fontFamily: 'Helvetica'
+        },
+        title: {
+            fontSize: 18,
+            textAlign: 'center',
+            marginBottom: 20,
+            fontFamily: 'Helvetica-Bold'
+        },
+        customerHeader: {
+            fontSize: 12,
+            backgroundColor: '#f0f0f0',
+            padding: 5,
+            marginTop: 10,
+            fontFamily: 'Helvetica-Bold'
+        },
+        table: {
+            display: 'table',
+            width: 'auto',
+            borderStyle: 'solid',
+            borderWidth: 1,
+            borderRightWidth: 0,
+            borderBottomWidth: 0
+        },
+        tableRow: {
+            flexDirection: 'row'
+        },
+        tableColHeader: {
+            width: '16.66%',
+            borderStyle: 'solid',
+            borderWidth: 1,
+            borderLeftWidth: 0,
+            borderTopWidth: 0,
+            backgroundColor: '#e0e0e0',
+            padding: 5,
+            fontFamily: 'Helvetica-Bold'
+        },
+        tableCol: {
+            width: '16.66%',
+            borderStyle: 'solid',
+            borderWidth: 1,
+            borderLeftWidth: 0,
+            borderTopWidth: 0,
+            padding: 5
+        },
+        descriptionCol: {
+             width: '33.32%',
+        }
+    });
+
+    const descriptionColStyle = {...styles.tableCol, ...styles.descriptionCol};
+    const descriptionHeaderStyle = {...styles.tableColHeader, ...styles.descriptionCol};
+
+
+    return (
+        <Document>
+            <Page style={styles.page} orientation="landscape">
+                <Text style={styles.title}>{selectedWeek} - Yacht Sail Production Schedule</Text>
+                
+                <View style={styles.table}>
+                    {/* Table Header */}
+                    <View style={styles.tableRow}>
+                        <Text style={styles.tableColHeader}>Aqua Order #</Text>
+                        <Text style={styles.tableColHeader}>Customer PO</Text>
+                        <Text style={styles.tableColHeader}>IFS Order #</Text>
+                        <Text style={descriptionHeaderStyle}>Order Description</Text>
+                        <Text style={styles.tableColHeader}>Qty</Text>
+                        <Text style={styles.tableColHeader}>Delivery Date</Text>
+                    </View>
+                </View>
+
+                {Object.keys(ordersByCustomer).sort().map(customerName => (
+                    <View key={customerName}>
+                        <Text style={styles.customerHeader}>{customerName}</Text>
+                        <View style={styles.table}>
+                            {ordersByCustomer[customerName].map(order => (
+                                <View style={styles.tableRow} key={order.id}>
+                                    <Text style={styles.tableCol}>{order.aquaOrderNumber || ''}</Text>
+                                    <Text style={styles.tableCol}>{order.customerPO || ''}</Text>
+                                    <Text style={styles.tableCol}>{order.ifsOrderNo || ''}</Text>
+                                    <Text style={descriptionColStyle}>{`${order.productName || ''} - ${order.material || ''} - ${order.size || ''}`}</Text>
+                                    <Text style={styles.tableCol}>{order.quantity || ''}</Text>
+                                    <Text style={styles.tableCol}>{order.deliveryDate || ''}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                ))}
+            </Page>
+        </Document>
     );
 };
