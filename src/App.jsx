@@ -1286,24 +1286,20 @@ const WeeklyScheduleView = ({ user }) => {
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
     const isCustomer = user.role === 'customer';
 
-    // MODIFIED: useEffect to use a simplified query for customers and client-side filtering
     useEffect(() => {
         if (!user) return;
         let ordersQuery;
 
         if (isCustomer) {
             if (!user.customerCompanyId) return;
-            // Simplified query for customers
             ordersQuery = query(collection(db, "orders"), where("customerId", "==", user.customerCompanyId));
         } else {
-            // Original query for admin/production
             ordersQuery = query(collection(db, "orders"), where("status", "!=", "Cancelled"));
         }
         
         const unsubOrders = onSnapshot(ordersQuery, (snap) => {
             let ordersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-            // For customers, filter out cancelled orders on the client
             if (isCustomer) {
                 ordersData = ordersData.filter(order => order.status !== 'Cancelled');
             }
@@ -1321,7 +1317,7 @@ const WeeklyScheduleView = ({ user }) => {
 
         return () => { unsubOrders(); unsubStatuses(); };
     }, [user, isCustomer]);
-
+    
     const ordersByCustomer = useMemo(() => {
         if (!selectedWeek || !Array.isArray(allOrders)) return {};
         const weekOrders = allOrders.filter(o => o.deliveryWeek === selectedWeek && o.status?.toLowerCase() !== 'shipped');
@@ -1391,15 +1387,22 @@ const WeeklyScheduleView = ({ user }) => {
     return (
         <div>
             <div className="d-flex justify-content-between align-items-center mb-3">
-                {!isCustomer && (
+                {/* === FIX STARTS HERE === */}
+                {/* Conditionally render the PDF link only when there is data. This prevents the component from crashing on re-render. */}
+                {!isCustomer && selectedWeek && Object.keys(ordersByCustomer).length > 0 ? (
                     <PDFDownloadLink
                         document={schedulePdfDocument}
-                        fileName={`production_schedule_${selectedWeek || 'all'}.pdf`}
-                        className={`btn btn-secondary ${!selectedWeek ? 'disabled' : ''}`}
+                        fileName={`production_schedule_${selectedWeek}.pdf`}
+                        className="btn btn-secondary"
                     >
                         {({ loading }) => (loading ? 'Loading...' : 'Export to PDF')}
                     </PDFDownloadLink>
+                ) : (
+                    // Render a placeholder to prevent layout shift
+                    <div></div>
                 )}
+                {/* === FIX ENDS HERE === */}
+
                 <div className="col-md-4">
                     <select className="form-select" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
                         <option value="">Select Delivery Week...</option>
