@@ -586,6 +586,18 @@ const Dashboard = ({ user }) => {
         return () => unsubscribe();
     }, [user, currentWeek]);
 
+    // MODIFIED: Added useMemo to group orders by customer for non-customer roles
+    const ordersByCustomer = useMemo(() => {
+        if (user.role === 'customer' || !weeklyOrders) return {};
+        return weeklyOrders.reduce((acc, order) => {
+            const customer = order.customerCompanyName || 'Unknown Customer';
+            if (!acc[customer]) acc[customer] = [];
+            acc[customer].push(order);
+            return acc;
+        }, {});
+    }, [weeklyOrders, user.role]);
+
+
     return (
         <div className="container-fluid">
             <div className="card">
@@ -603,27 +615,44 @@ const Dashboard = ({ user }) => {
                                 <thead>
                                     <tr>
                                         <th>Aqua Order #</th>
-                                        {user.role !== 'customer' && <th>Customer</th>}
+                                        {/* Show Customer column only if it's a flat list for customers */}
+                                        {user.role === 'customer' && <th>Customer</th>}
                                         <th>Customer PO</th>
                                         <th>Product</th>
                                         <th>Status</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {weeklyOrders.map(order => (
-                                        <tr key={order.id}>
-                                            <td>
-                                                <a href="#" onClick={(e) => { e.preventDefault(); setViewingHistoryFor(order); }}>
-                                                    {order.aquaOrderNumber}
-                                                </a>
-                                            </td>
-                                            {user.role !== 'customer' && <td>{order.customerCompanyName}</td>}
-                                            <td>{order.customerPO}</td>
-                                            <td>{order.productName}</td>
-                                            <td><span className={`badge ${getStatusBadgeClass(order.status)}`}>{order.status}</span></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
+                                {/* MODIFIED: Conditional rendering based on user role */}
+                                {user.role === 'customer' ? (
+                                    <tbody>
+                                        {weeklyOrders.map(order => (
+                                            <tr key={order.id}>
+                                                <td><a href="#" onClick={(e) => { e.preventDefault(); setViewingHistoryFor(order); }}>{order.aquaOrderNumber}</a></td>
+                                                <td>{order.customerCompanyName}</td>
+                                                <td>{order.customerPO}</td>
+                                                <td>{order.productName}</td>
+                                                <td><span className={`badge ${getStatusBadgeClass(order.status)}`}>{order.status}</span></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                ) : (
+                                    /* Grouped view for admin/production */
+                                    Object.keys(ordersByCustomer).sort().map(customerName => (
+                                        <tbody key={customerName}>
+                                            <tr className="table-light">
+                                                <th colSpan="4" className="ps-2">{customerName}</th>
+                                            </tr>
+                                            {ordersByCustomer[customerName].map(order => (
+                                                <tr key={order.id}>
+                                                    <td><a href="#" onClick={(e) => { e.preventDefault(); setViewingHistoryFor(order); }}>{order.aquaOrderNumber}</a></td>
+                                                    <td>{order.customerPO}</td>
+                                                    <td>{order.productName}</td>
+                                                    <td><span className={`badge ${getStatusBadgeClass(order.status)}`}>{order.status}</span></td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    ))
+                                )}
                             </table>
                         </div>
                     )}
@@ -1008,16 +1037,31 @@ const OrderList = ({ user }) => {
     useEffect(() => {
         setCurrentPage(1);
     }, [activeTab, searchTerm]);
+
+    // NEW: Helper function to extract the number from an order string like 'S123' or 'A123-A125'
+    const parseOrderNumber = (orderString) => {
+        if (!orderString) return 0;
+        const match = orderString.match(/\d+/); // Find the first sequence of digits
+        return match ? parseInt(match[0], 10) : 0;
+    };
     
-    // 1. First, filter by the active tab
+    // MODIFIED: This memo now includes the numeric sort
     const categorizedOrders = useMemo(() => {
+        let filtered;
         if (activeTab === 'sails') {
-            return orders.filter(order => order.orderTypeName?.toLowerCase() === 'sail');
+            filtered = orders.filter(order => order.orderTypeName?.toLowerCase() === 'sail');
+        } else if (activeTab === 'accessories') {
+            filtered = orders.filter(order => order.orderTypeName?.toLowerCase() !== 'sail');
+        } else {
+            filtered = orders; // 'all' tab
         }
-        if (activeTab === 'accessories') {
-            return orders.filter(order => order.orderTypeName?.toLowerCase() !== 'sail');
-        }
-        return orders; // 'all' tab
+
+        // Add sorting logic here
+        return filtered.sort((a, b) => {
+            const numA = parseOrderNumber(a.aquaOrderNumber);
+            const numB = parseOrderNumber(b.aquaOrderNumber);
+            return numB - numA; // Sort in descending order to get newest on top
+        });
     }, [orders, activeTab]);
 
     // 2. Then, filter by the search term
@@ -1258,8 +1302,9 @@ const WeeklyScheduleView = ({ user }) => {
         return () => { unsubOrders(); unsubStatuses(); };
     }, [user]);
     
+    // MODIFIED: Added defensive check to ensure allOrders is an array
     const ordersByCustomer = useMemo(() => {
-        if (!selectedWeek) return {};
+        if (!selectedWeek || !Array.isArray(allOrders)) return {};
         const weekOrders = allOrders.filter(o => o.deliveryWeek === selectedWeek && o.status?.toLowerCase() !== 'shipped');
         return weekOrders.reduce((acc, order) => {
             const customer = order.customerCompanyName || 'Unknown Customer';
@@ -1270,9 +1315,15 @@ const WeeklyScheduleView = ({ user }) => {
     }, [selectedWeek, allOrders]);
 
     const shippedOrders = useMemo(() => {
-        if (!selectedWeek) return [];
+        if (!selectedWeek || !Array.isArray(allOrders)) return [];
         return allOrders.filter(o => o.deliveryWeek === selectedWeek && o.status?.toLowerCase() === 'shipped');
     }, [selectedWeek, allOrders]);
+
+    // NEW: Memoize the PDF document to improve stability
+    const schedulePdfDocument = useMemo(() => (
+        <SchedulePDFDocument ordersByCustomer={ordersByCustomer} selectedWeek={selectedWeek} />
+    ), [ordersByCustomer, selectedWeek]);
+
 
     const updateOrderStatus = async (order, newStatusId, reason = null) => {
         const newStatus = productionStatuses.find(s => s.id === newStatusId);
@@ -1324,7 +1375,7 @@ const WeeklyScheduleView = ({ user }) => {
             <div className="d-flex justify-content-between align-items-center mb-3">
                 {!isCustomer && (
                     <PDFDownloadLink
-                        document={<SchedulePDFDocument ordersByCustomer={ordersByCustomer} selectedWeek={selectedWeek} />}
+                        document={schedulePdfDocument}
                         fileName={`production_schedule_${selectedWeek || 'all'}.pdf`}
                         className={`btn btn-secondary ${!selectedWeek ? 'disabled' : ''}`}
                     >
@@ -1526,11 +1577,21 @@ const AllActiveOrdersView = ({ user }) => {
         return () => unsub();
     }, [user]);
 
-    const handleDateChange = async (orderId, newDate) => {
-        if(isCustomer || !newDate) return;
-        const newWeek = getWeekStringFromDate(newDate);
+    // FIXED: Helper function to format a Date object into 'YYYY-MM-DD' without timezone conversion
+    const toYYYYMMDD = (date) => {
+        if (!date) return '';
+        const d = new Date(date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const handleDateChange = async (orderId, newDateString) => {
+        if(isCustomer || !newDateString) return;
+        const newWeek = getWeekStringFromDate(newDateString);
         await updateDoc(doc(db, "orders", orderId), { 
-            deliveryDate: newDate,
+            deliveryDate: newDateString,
             deliveryWeek: newWeek
         });
     };
@@ -1603,9 +1664,11 @@ const AllActiveOrdersView = ({ user }) => {
                                     <td>{order.quantity}</td>
                                     <td>
                                         <DatePicker
-                                            selected={order.deliveryDate ? new Date(order.deliveryDate + 'T00:00:00Z') : null}
+                                            // FIX 1: Parse the date string to ensure it's treated as local time
+                                            selected={order.deliveryDate ? new Date(order.deliveryDate.replace(/-/g, '/')) : null}
                                             onChange={(date) => {
-                                                const dateString = date ? date.toISOString().split('T')[0] : '';
+                                                // FIX 2: Use the helper function to format the date correctly
+                                                const dateString = date ? toYYYYMMDD(date) : '';
                                                 handleDateChange(order.id, dateString);
                                             }}
                                             showWeekNumbers
