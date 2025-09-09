@@ -560,7 +560,6 @@ const Dashboard = ({ user }) => {
         return 'bg-primary';
     };
 
-    // MODIFIED: useEffect to fetch data with client-side filtering for customers
     useEffect(() => {
         const isCustomer = user.role === 'customer';
         let q;
@@ -571,17 +570,14 @@ const Dashboard = ({ user }) => {
                 setWeeklyOrders([]);
                 return;
             }
-            // Simplified query for customers - gets all their orders
             q = query(collection(db, "orders"), where("customerId", "==", user.customerCompanyId));
         } else {
-            // Original query for admin/production - gets orders for a specific week
             q = query(collection(db, "orders"), where("deliveryWeek", "==", currentWeek));
         }
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             let ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            // For customers, filter by week on the client side
             if (isCustomer) {
                 ordersData = ordersData.filter(order => order.deliveryWeek === currentWeek);
             }
@@ -1027,16 +1023,13 @@ const OrderList = ({ user }) => {
     const entriesPerPage = 25;
     const isCustomer = user.role === 'customer';
 
-    // MODIFIED: useEffect to use a simplified query for customers
     useEffect(() => {
         if (!user) return;
         let q;
         if (isCustomer) { 
             if (!user.customerCompanyId) return;
-            // Simplified query for customers to avoid needing a composite index
             q = query(collection(db, "orders"), where("customerId", "==", user.customerCompanyId));
         } else { 
-            // Query for admin includes server-side sorting
             q = query(collection(db, "orders"), orderBy("createdAt", "desc")); 
         }
         const unsub = onSnapshot(q, snap => setOrders(snap.docs.map(d => ({id: d.id, ...d.data()}))));
@@ -1044,7 +1037,6 @@ const OrderList = ({ user }) => {
     }, [user, isCustomer]);
 
 
-    // Reset to the first page when the filter changes
     useEffect(() => {
         setCurrentPage(1);
     }, [activeTab, searchTerm]);
@@ -1062,7 +1054,7 @@ const OrderList = ({ user }) => {
         } else if (activeTab === 'accessories') {
             filtered = orders.filter(order => order.orderTypeName?.toLowerCase() !== 'sail');
         } else {
-            filtered = orders; // 'all' tab
+            filtered = orders;
         }
 
         return filtered.sort((a, b) => {
@@ -1276,6 +1268,9 @@ const ProductionPage = ({ user }) => {
     );
 };
 
+// =========================================================================================
+// === MODIFIED WeeklyScheduleView: PDF Export removed to fix crash ========================
+// =========================================================================================
 const WeeklyScheduleView = ({ user }) => {
     const [allOrders, setAllOrders] = useState([]);
     const [productionStatuses, setProductionStatuses] = useState([]);
@@ -1334,11 +1329,6 @@ const WeeklyScheduleView = ({ user }) => {
         return allOrders.filter(o => o.deliveryWeek === selectedWeek && o.status?.toLowerCase() === 'shipped');
     }, [selectedWeek, allOrders]);
 
-    const schedulePdfDocument = useMemo(() => (
-        <SchedulePDFDocument ordersByCustomer={ordersByCustomer} selectedWeek={selectedWeek} />
-    ), [ordersByCustomer, selectedWeek]);
-
-
     const updateOrderStatus = async (order, newStatusId, reason = null) => {
         const newStatus = productionStatuses.find(s => s.id === newStatusId);
         if (!newStatus) return;
@@ -1386,23 +1376,7 @@ const WeeklyScheduleView = ({ user }) => {
     
     return (
         <div>
-            <div className="d-flex justify-content-between align-items-center mb-3">
-                {/* === FIX STARTS HERE === */}
-                {/* Conditionally render the PDF link only when there is data. This prevents the component from crashing on re-render. */}
-                {!isCustomer && selectedWeek && Object.keys(ordersByCustomer).length > 0 ? (
-                    <PDFDownloadLink
-                        document={schedulePdfDocument}
-                        fileName={`production_schedule_${selectedWeek}.pdf`}
-                        className="btn btn-secondary"
-                    >
-                        {({ loading }) => (loading ? 'Loading...' : 'Export to PDF')}
-                    </PDFDownloadLink>
-                ) : (
-                    // Render a placeholder to prevent layout shift
-                    <div></div>
-                )}
-                {/* === FIX ENDS HERE === */}
-
+            <div className="d-flex justify-content-end align-items-center mb-3">
                 <div className="col-md-4">
                     <select className="form-select" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
                         <option value="">Select Delivery Week...</option>
@@ -1582,14 +1556,18 @@ const OrderHistoryView = ({ user }) => {
     );
 };
 
+// =========================================================================================
+// === MODIFIED AllActiveOrdersView: PDF Export ADDED here =================================
+// =========================================================================================
 const AllActiveOrdersView = ({ user }) => {
     const [activeOrders, setActiveOrders] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
+    const [deliveryWeeks, setDeliveryWeeks] = useState([]);
+    const [selectedWeek, setSelectedWeek] = useState('');
     const isCustomer = user.role === 'customer';
 
-    // MODIFIED: useEffect to use a simplified query for customers and client-side filtering
     useEffect(() => {
         if (!user) return;
         let q;
@@ -1600,20 +1578,22 @@ const AllActiveOrdersView = ({ user }) => {
                 setActiveOrders([]);
                 return;
             };
-            // Simplified query for customers
             q = query(collection(db, "orders"), where("customerId", "==", user.customerCompanyId));
         } else {
-            // Original query for admin/production
             q = query(collection(db, "orders"), where("status", "not-in", ["Shipped", "Cancelled"]));
         }
         
         const unsub = onSnapshot(q, (snap) => {
             let activeOrdersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             
-            // For customers, filter for active orders on the client
             if(isCustomer) {
                 activeOrdersData = activeOrdersData.filter(order => order.status !== "Shipped" && order.status !== "Cancelled");
             }
+
+            // Populate weeks dropdown from all active orders
+            const weeks = [...new Set(activeOrdersData.map(o => o.deliveryWeek).filter(Boolean))];
+            weeks.sort();
+            setDeliveryWeeks(weeks);
 
             setActiveOrders(activeOrdersData);
             setIsLoading(false);
@@ -1640,7 +1620,14 @@ const AllActiveOrdersView = ({ user }) => {
     };
 
     const groupedAndFilteredOrders = useMemo(() => {
-        const filtered = activeOrders.filter(order => {
+        let ordersToProcess = activeOrders;
+
+        // Filter by selected week if one is chosen
+        if (selectedWeek) {
+            ordersToProcess = ordersToProcess.filter(order => order.deliveryWeek === selectedWeek);
+        }
+
+        const filtered = ordersToProcess.filter(order => {
             if (!searchTerm) return true;
             const lowercasedFilter = searchTerm.toLowerCase();
             return Object.values(order).some(value =>
@@ -1660,7 +1647,7 @@ const AllActiveOrdersView = ({ user }) => {
         }
         
         return grouped;
-    }, [activeOrders, searchTerm]);
+    }, [activeOrders, searchTerm, selectedWeek]);
 
     if (isLoading) {
         return <div className="text-center"><div className="spinner-border" role="status"><span className="visually-hidden">Loading...</span></div></div>;
@@ -1668,9 +1655,25 @@ const AllActiveOrdersView = ({ user }) => {
 
     return (
         <div>
-            <div className="d-flex justify-content-end mb-3">
-                <div className="col-md-4">
-                     <input
+            <div className="d-flex justify-content-between align-items-center mb-3">
+                {/* PDF Download Button */}
+                <PDFDownloadLink
+                    document={<SchedulePDFDocument ordersByCustomer={groupedAndFilteredOrders} selectedWeek={selectedWeek} />}
+                    fileName={`production_schedule_${selectedWeek || 'all'}.pdf`}
+                    className={`btn btn-secondary ${!selectedWeek ? 'disabled' : ''}`}
+                >
+                    {({ loading }) => (loading ? 'Loading...' : 'Export to PDF')}
+                </PDFDownloadLink>
+
+                <div className="d-flex gap-2">
+                    {/* Week Selector */}
+                    <select className="form-select" style={{minWidth: '200px'}} value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
+                        <option value="">Filter by Delivery Week...</option>
+                        {deliveryWeeks.map(week => <option key={week} value={week}>{week}</option>)}
+                    </select>
+
+                    {/* Search Input */}
+                    <input
                         type="text"
                         className="form-control"
                         placeholder="Search active orders..."
@@ -1860,7 +1863,6 @@ const CustomerStock = ({ user }) => {
             const stockCollectionRef = collection(db, "stock", selectedCustomer, "items");
             const snapshot = await getDocs(stockCollectionRef);
             
-            // Firebase allows a maximum of 500 operations per batch
             const batchSize = 500;
             for (let i = 0; i < snapshot.docs.length; i += batchSize) {
                 const batch = writeBatch(db);
@@ -2120,7 +2122,6 @@ const CustomerStock = ({ user }) => {
                 )}
 
 
-                {/* Categorized Items Table */}
                 <h3 className="h5 mb-3 mt-4">Categorized Stock</h3>
                 <div className="table-responsive">
                     <table className="table table-sm table-hover table-bordered">
@@ -2397,7 +2398,6 @@ const CustomerManagementTab = () => {
                 </table>
             </div>
 
-            {/* Edit Customer Modal */}
             {editingCustomer && (
                  <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
                     <div className="modal-dialog">
@@ -2448,7 +2448,7 @@ const DataManagementTab = () => {
     const [isUploading, setIsUploading] = useState(false);
     const productFileInputRef = useRef(null);
 
-    const [editingItem, setEditingItem] = useState(null); // { type: 'orderType' | 'product', data: { id, name, ... } }
+    const [editingItem, setEditingItem] = useState(null);
 
     useEffect(() => {
         onSnapshot(collection(db, "orderTypes"), snap => setOrderTypes(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b)=>(a.order||0)-(b.order||0))));
@@ -2655,7 +2655,6 @@ const DataManagementTab = () => {
                             </div>
                             
                             <div className="flex-grow-1" style={{overflowY: 'auto', maxHeight: '400px'}}>
-                                {/* Sail Products */}
                                 <h6 className="mt-3">Sail Products ({categorizedProducts.sail.length})</h6>
                                 <ul className="list-group">
                                     {categorizedProducts.sail.map((item) => (
@@ -2669,7 +2668,6 @@ const DataManagementTab = () => {
                                     ))}
                                 </ul>
 
-                                 {/* Accessory Products */}
                                 <h6 className="mt-4">Accessory Products ({categorizedProducts.accessory.length})</h6>
                                 <ul className="list-group">
                                     {categorizedProducts.accessory.map((item) => (
@@ -2719,7 +2717,6 @@ const DataManagementTab = () => {
                 </div>
             </div>
 
-             {/* Edit Modal */}
             {editingItem && (
                  <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
                     <div className="modal-dialog">
@@ -2915,7 +2912,6 @@ const ProductionStatusManagement = ({ orderTypes, products }) => {
 
 
 const SettingsPage = () => {
-    // ... logic same
     const [settings, setSettings] = useState({ companyName: "", welcomeMessage: "", logoUrl: "", lastSailOrder: 0, lastAccessoryOrder: 0, qcEmailSubject: "", qcEmailBody: "" });
     const docRef = doc(db, "settings", "main");
     useEffect(() => { onSnapshot(docRef, (doc) => { if (doc.exists()) setSettings(prev => ({ ...prev, ...doc.data() })); }); }, []);
@@ -3021,11 +3017,15 @@ const OrderHistoryModal = ({ order, onClose }) => {
     );
 };
 
-// --- Helper Component for PDF Document Generation ---
+// =========================================================================================
+// === MODIFIED SchedulePDFDocument: Added repeating headers and footer ====================
+// =========================================================================================
 const SchedulePDFDocument = ({ ordersByCustomer, selectedWeek }) => {
     const styles = StyleSheet.create({
         page: {
-            padding: 30,
+            paddingTop: 35,
+            paddingBottom: 65,
+            paddingHorizontal: 30,
             fontSize: 10,
             fontFamily: 'Helvetica'
         },
@@ -3073,6 +3073,16 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeek }) => {
         },
         descriptionCol: {
              width: '33.32%',
+        },
+        footer: {
+            position: 'absolute',
+            bottom: 30,
+            left: 30,
+            right: 30,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            fontSize: 9,
+            color: 'grey',
         }
     });
 
@@ -3083,11 +3093,10 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeek }) => {
     return (
         <Document>
             <Page style={styles.page} orientation="landscape">
-                <Text style={styles.title}>{selectedWeek} - Yacht Sail Production Schedule</Text>
+                <Text style={styles.title} fixed>{selectedWeek} - Yacht Sail Production Schedule</Text>
                 
                 <View style={styles.table}>
-                    {/* Table Header */}
-                    <View style={styles.tableRow}>
+                    <View style={styles.tableRow} fixed>
                         <Text style={styles.tableColHeader}>Aqua Order #</Text>
                         <Text style={styles.tableColHeader}>Customer PO</Text>
                         <Text style={styles.tableColHeader}>IFS Order #</Text>
@@ -3095,12 +3104,10 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeek }) => {
                         <Text style={styles.tableColHeader}>Qty</Text>
                         <Text style={styles.tableColHeader}>Delivery Date</Text>
                     </View>
-                </View>
 
-                {Object.keys(ordersByCustomer).sort().map(customerName => (
-                    <View key={customerName}>
-                        <Text style={styles.customerHeader}>{customerName}</Text>
-                        <View style={styles.table}>
+                    {Object.keys(ordersByCustomer).sort().map(customerName => (
+                        <View key={customerName} break={false}>
+                            <Text style={styles.customerHeader}>{customerName}</Text>
                             {ordersByCustomer[customerName].map(order => (
                                 <View style={styles.tableRow} key={order.id}>
                                     <Text style={styles.tableCol}>{order.aquaOrderNumber || ''}</Text>
@@ -3112,8 +3119,15 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeek }) => {
                                 </View>
                             ))}
                         </View>
-                    </View>
-                ))}
+                    ))}
+                </View>
+
+                <View style={styles.footer} fixed>
+                    <Text>Prepared By Chamal Madushanke</Text>
+                    <Text render={({ pageNumber, totalPages }) => (
+                        `Page ${pageNumber} of ${totalPages}`
+                    )} />
+                </View>
             </Page>
         </Document>
     );
