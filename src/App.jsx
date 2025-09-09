@@ -166,12 +166,11 @@ export default function App() {
             unsubUserData = onSnapshot(doc(db, "users", user.uid), (userDoc) => {
                 const data = userDoc.data();
                 setUserData(data);
-                if (data?.role === 'super_admin') {
-                     unsubSettings = onSnapshot(doc(db, "settings", "main"), (settingsDoc) => {
-                        if (settingsDoc.exists()) setSettings(settingsDoc.data());
-                    });
-                }
-                 setLoading(false);
+                 // Always fetch settings if user is logged in
+                unsubSettings = onSnapshot(doc(db, "settings", "main"), (settingsDoc) => {
+                    if (settingsDoc.exists()) setSettings(settingsDoc.data());
+                });
+                setLoading(false);
             }, () => setLoading(false));
         } else {
             setLoading(false);
@@ -228,7 +227,7 @@ export default function App() {
              const renderPage = () => {
                 switch(currentPage) {
                     case 'new-order': return (isAdmin || isProduction) ? <NewOrderForm user={userData} onOrderCreated={setLastGeneratedOrderNumber} lastGeneratedOrderNumber={lastGeneratedOrderNumber} /> : <Dashboard user={userData} />;
-                    case 'order-list': return <OrderList user={userData} />;
+                    case 'order-list': return <OrderList user={userData} settings={settings} />;
                     case 'planning': return <ProductionPage user={userData} />;
                     case 'stock': return <CustomerStock user={userData} />;
                     case 'settings': return isAdmin ? <SettingsPage /> : <Dashboard user={userData} />;
@@ -996,8 +995,8 @@ const OrderList = ({ user }) => {
         if (!user) return;
         let q;
         if (isCustomer) { 
-            if (!user.customerCompanyName) return;
-            q = query(collection(db, "orders"), where("customerCompanyName", "==", user.customerCompanyName), orderBy("createdAt", "desc"));
+            if (!user.customerCompanyId) return;
+            q = query(collection(db, "orders"), where("customerId", "==", user.customerCompanyId), orderBy("createdAt", "desc"));
         } else { 
             q = query(collection(db, "orders"), orderBy("createdAt", "desc")); 
         }
@@ -1240,8 +1239,8 @@ const WeeklyScheduleView = ({ user }) => {
         if (!user) return;
         let ordersQuery = query(collection(db, "orders"), where("status", "!=", "Cancelled"));
         if(isCustomer) {
-             if (!user.customerCompanyName) return;
-            ordersQuery = query(ordersQuery, where("customerCompanyName", "==", user.customerCompanyName));
+             if (!user.customerCompanyId) return;
+            ordersQuery = query(ordersQuery, where("customerId", "==", user.customerCompanyId));
         }
         const unsubOrders = onSnapshot(ordersQuery, (snap) => {
             const ordersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1314,6 +1313,7 @@ const WeeklyScheduleView = ({ user }) => {
     
     const getValidStatuses = (order) => {
         return productionStatuses.filter(status => 
+            order.orderTypeId && order.productId &&
             status.orderTypeIds?.includes(order.orderTypeId) && 
             status.productTypeIds?.includes(order.productId)
         );
@@ -1446,7 +1446,7 @@ const OrderHistoryView = ({ user }) => {
         try {
             const constraints = [where("aquaOrderNumber", "==", searchQuery)];
             if (user.role === 'customer') {
-                constraints.push(where("customerCompanyName", "==", user.customerCompanyName));
+                constraints.push(where("customerId", "==", user.customerCompanyId));
             }
             const orderQuery = query(collection(db, "orders"), ...constraints);
             
@@ -1516,8 +1516,8 @@ const AllActiveOrdersView = ({ user }) => {
         if (!user) return;
         let q = query(collection(db, "orders"), where("status", "not-in", ["Shipped", "Cancelled"]));
         if (isCustomer) {
-             if (!user.customerCompanyName) return;
-            q = query(q, where("customerCompanyName", "==", user.customerCompanyName));
+             if (!user.customerCompanyId) return;
+            q = query(q, where("customerId", "==", user.customerCompanyId));
         }
         const unsub = onSnapshot(q, (snap) => {
             setActiveOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -1962,7 +1962,7 @@ const CustomerStock = ({ user }) => {
                                 <th>PART_NO</th>
                                 <th>DESCRIPTION</th>
                                 <th>TOTAL_QTY</th>
-                                {isAdmin && <th>Category</th>}
+                                <th>Category</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1976,7 +1976,13 @@ const CustomerStock = ({ user }) => {
                                                     <td>{item.PART_NO}</td>
                                                     <td>{item.DESCRIPTION}</td>
                                                     <td>{item.TOTAL_QTY}</td>
-                                                    {isAdmin && <td><CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} /></td>}
+                                                    <td>
+                                                        {isAdmin ? (
+                                                            <CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} />
+                                                        ) : (
+                                                            <span className="badge bg-secondary">{item.category || 'Unassigned'}</span>
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             ))
                                         ))}
