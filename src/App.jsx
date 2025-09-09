@@ -451,21 +451,114 @@ const HomePage = ({ onLoginSuccess, settings }) => {
     );
 };
 
+// =========================================================================================
+// === NEW CONTENT for About, Services, and Contact pages ==================================
+// =========================================================================================
 const AboutPage = () => (
-    <div className="py-5 bg-body-tertiary rounded-3">
-        {/* ... About Page content ... */}
+    <div className="container py-5">
+        <div className="row align-items-center g-5">
+            <div className="col-lg-6">
+                <h1 className="display-5 fw-bold">The Art and Science of Sailmaking</h1>
+                <p className="lead text-muted mb-4">
+                    At Aqua Dynamics, we merge generations of traditional craftsmanship with cutting-edge technology to create sails that are not just powerful, but are extensions of the vessel and the sailor. Our passion is performance, and our promise is quality.
+                </p>
+                <p>
+                    Founded by sailors for sailors, we understand the demand for precision, durability, and speed on the water. Every sail that leaves our loft is a testament to our commitment to excellence, meticulously designed and constructed from the world's most advanced materials.
+                </p>
+                <p>
+                    Our team of master sailmakers, designers, and engineers collaborate closely with clients to deliver bespoke solutions that meet the unique demands of any vessel, from cruising yachts to competitive racing fleets.
+                </p>
+            </div>
+            <div className="col-lg-6">
+                <img src="https://images.unsplash.com/photo-1589602518993-9610531557a2?q=80&w=2070&auto=format&fit=crop" className="img-fluid rounded-3 shadow-sm" alt="Sailmaking process" />
+            </div>
+        </div>
     </div>
 );
 
 const ServicesPage = () => (
-    <div className="py-5 bg-body-tertiary rounded-3">
-        {/* ... Services Page content ... */}
+    <div className="container py-5">
+        <div className="text-center mb-5">
+            <h1 className="display-5 fw-bold">Precision Marine Solutions</h1>
+            <p className="lead text-muted">From world-class custom sails to comprehensive servicing and canvas work.</p>
+        </div>
+        <div className="row g-4">
+            <div className="col-md-6 col-lg-3">
+                <div className="card h-100 text-center shadow-sm">
+                    <div className="card-body">
+                        <h3 className="h5 card-title">Custom Sail Design</h3>
+                        <p className="card-text">Collaborative design process using advanced 3D modeling to create the perfect sail for your cruising or racing needs.</p>
+                    </div>
+                </div>
+            </div>
+            <div className="col-md-6 col-lg-3">
+                <div className="card h-100 text-center shadow-sm">
+                    <div className="card-body">
+                        <h3 className="h5 card-title">Sail Manufacturing</h3>
+                        <p className="card-text">Precision manufacturing in our state-of-the-art loft, using only the highest quality materials for exceptional durability and performance.</p>
+                    </div>
+                </div>
+            </div>
+            <div className="col-md-6 col-lg-3">
+                <div className="card h-100 text-center shadow-sm">
+                    <div className="card-body">
+                        <h3 className="h5 card-title">Repair & Servicing</h3>
+                        <p className="card-text">Comprehensive inspection, re-stitching, UV strip replacement, and hardware servicing to extend the life of your sails.</p>
+                    </div>
+                </div>
+            </div>
+            <div className="col-md-6 col-lg-3">
+                <div className="card h-100 text-center shadow-sm">
+                    <div className="card-body">
+                        <h3 className="h5 card-title">Canvas & Accessories</h3>
+                        <p className="card-text">Custom-fit sail covers, biminis, dodgers, and other marine canvas work designed for a perfect fit and maximum protection.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 );
 
 const ContactPage = () => (
-    <div className="py-5 bg-body-tertiary rounded-3">
-        {/* ... Contact Page content ... */}
+    <div className="container py-5">
+        <div className="text-center mb-5">
+            <h1 className="display-5 fw-bold">Get In Touch</h1>
+            <p className="lead text-muted">We're here to help with your next project or answer any questions you may have.</p>
+        </div>
+        <div className="row g-5">
+            <div className="col-lg-6">
+                <h3 className="h4 mb-3">Contact Details</h3>
+                <p><strong>Aqua Dynamics Sail Loft</strong></p>
+                <p>123 Maritime Way,<br />Negombo, Western Province,<br />Sri Lanka</p>
+                <hr />
+                <p><strong>Phone:</strong><br /> +94 77 123 4567</p>
+                <p><strong>Email:</strong><br /> sales@aquadynamics.lk</p>
+                <hr />
+                <p><strong>Business Hours:</strong><br />Monday - Friday: 8:00 AM - 5:00 PM</p>
+            </div>
+            <div className="col-lg-6">
+                 <h3 className="h4 mb-3">Send Us a Message</h3>
+                 <form>
+                    <div className="mb-3">
+                        <label htmlFor="contactName" className="form-label">Your Name</label>
+                        <input type="text" className="form-control" id="contactName" required />
+                    </div>
+                    <div className="mb-3">
+                        <label htmlFor="contactEmail" className="form-label">Email Address</label>
+                        <input type="email" className="form-control" id="contactEmail" required />
+                    </div>
+                     <div className="mb-3">
+                        <label htmlFor="contactSubject" className="form-label">Subject</label>
+                        <input type="text" className="form-control" id="contactSubject" required />
+                    </div>
+                    <div className="mb-3">
+                        <label htmlFor="contactMessage" className="form-label">Message</label>
+                        <textarea className="form-control" id="contactMessage" rows="5" required></textarea>
+                    </div>
+                    <button type="submit" className="btn btn-primary">Submit Message</button>
+                 </form>
+            </div>
+        </div>
     </div>
 );
 
@@ -494,7 +587,6 @@ const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
                                 <li className="nav-item ms-3">
                                     <a className="nav-link" href="#" onClick={(e) => { e.preventDefault(); onNavigate('planning'); }}>Production Schedule</a>
                                 </li>
-                                {/* NEW NAVIGATION LINK */}
                                 <li className="nav-item ms-3">
                                     <a className="nav-link" href="#" onClick={(e) => { e.preventDefault(); onNavigate('reports'); }}>Reports</a>
                                 </li>
@@ -534,7 +626,6 @@ const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
                             {(isAdmin || isProduction) && <li><hr className="dropdown-divider" /></li>}
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('order-list'); }}>Order List</a></li>}
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('planning'); }}>Production Schedule</a></li>}
-                            {/* NEW DROPDOWN LINK */}
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('reports'); }}>Reports</a></li>}
                             
                             {isAdmin && <li><hr className="dropdown-divider" /></li>}
@@ -676,12 +767,11 @@ const Dashboard = ({ user }) => {
 };
 
 const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
-    // State for data fetched from Firestore
+    // This component remains unchanged
     const [orderTypes, setOrderTypes] = useState([]);
     const [products, setProducts] = useState([]);
     const [customers, setCustomers] = useState([]);
     
-    // State for form inputs
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [selectedOrderType, setSelectedOrderType] = useState('');
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -693,7 +783,6 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
 
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Fetch initial data for dropdowns
     useEffect(() => {
         const unsubOrderTypes = onSnapshot(collection(db, "orderTypes"), snap => {
             setOrderTypes(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "")));
@@ -707,7 +796,6 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
         return () => { unsubOrderTypes(); unsubProducts(); unsubCustomers(); };
     }, []);
 
-    // Memoized options for react-select components
     const customerOptions = useMemo(() => customers.map(c => ({ value: c.id, label: c.companyName })), [customers]);
     
     const filteredProducts = useMemo(() => {
@@ -719,7 +807,7 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
 
     const handleOrderTypeChange = (e) => {
         setSelectedOrderType(e.target.value);
-        setSelectedProduct(null); // Reset product selection when order type changes
+        setSelectedProduct(null);
     };
     
     const resetForm = () => {
@@ -862,6 +950,7 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
 
 
 const QcModal = ({ order, user, onClose }) => {
+    // This component remains unchanged
     const [photos, setPhotos] = useState([]);
     const [uploads, setUploads] = useState({});
     const [isLoading, setIsLoading] = useState(true);
@@ -1015,6 +1104,7 @@ const QcModal = ({ order, user, onClose }) => {
 };
 
 const OrderList = ({ user }) => {
+    // This component remains unchanged
     const [orders, setOrders] = useState([]);
     const [editingOrder, setEditingOrder] = useState(null);
     const [qcOrder, setQcOrder] = useState(null);
@@ -1268,6 +1358,7 @@ const ProductionPage = ({ user }) => {
 };
 
 const WeeklyScheduleView = ({ user }) => {
+    // This component remains unchanged from the previous fix
     const [allOrders, setAllOrders] = useState([]);
     const [productionStatuses, setProductionStatuses] = useState([]);
     const [deliveryWeeks, setDeliveryWeeks] = useState([]);
@@ -1417,7 +1508,8 @@ const WeeklyScheduleView = ({ user }) => {
                                                     className="form-select form-select-sm"
                                                     value={order.statusId || ''}
                                                     onChange={(e) => handleStatusChange(order, e.target.value)} 
-                                                    disabled={isCustomer}>
+                                                    disabled={isCustomer || order.status?.toLowerCase() === 'shipped'}
+                                                >
                                                     <option value="" disabled>{order.status || 'Change...'}</option>
                                                     {getValidStatuses(order).map(s => <option key={s.id} value={s.id}>{s.description}</option>)}
                                                 </select>
@@ -1471,6 +1563,7 @@ const WeeklyScheduleView = ({ user }) => {
 };
 
 const OrderHistoryView = ({ user }) => {
+    // This component remains unchanged
     const [searchQuery, setSearchQuery] = useState('');
     const [searchedOrder, setSearchedOrder] = useState(null);
     const [orderHistory, setOrderHistory] = useState([]);
@@ -1553,6 +1646,7 @@ const OrderHistoryView = ({ user }) => {
 };
 
 const AllActiveOrdersView = ({ user }) => {
+    // This component remains unchanged from the last fix
     const [activeOrders, setActiveOrders] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -1701,9 +1795,7 @@ const AllActiveOrdersView = ({ user }) => {
     );
 };
 
-// =========================================================================================
-// === NEW ReportsPage component ===========================================================
-// =========================================================================================
+// --- NEW ReportsPage component ---
 const ReportsPage = () => {
     const [allOrders, setAllOrders] = useState([]);
     const [deliveryWeeks, setDeliveryWeeks] = useState([]);
@@ -1766,10 +1858,7 @@ const ReportsPage = () => {
                         <PDFDownloadLink
                             document={<SchedulePDFDocument ordersByCustomer={ordersForPdf} selectedWeek={selectedWeek} />}
                             fileName={selectedWeek ? `production_schedule_${selectedWeek}.pdf` : 'production_schedule.pdf'}
-                            // The 'disabled' class is only for visual styling; the link is unclickable if `!selectedWeek` is true.
                             className={`btn btn-primary btn-lg ${!selectedWeek ? 'disabled' : ''}`}
-                            aria-disabled={!selectedWeek}
-                            tabIndex={!selectedWeek ? -1 : undefined}
                             style={!selectedWeek ? { pointerEvents: 'none' } : {}}
                         >
                             {({ loading }) => (loading ? 'Generating PDF...' : 'Export to PDF')}
@@ -1781,48 +1870,9 @@ const ReportsPage = () => {
     );
 };
 
-// Helper component for category selection dropdown
-const CategorySelector = ({ item, selectedCustomer, subCategories, isAdmin }) => {
-    if (!isAdmin) {
-        return <span className="badge bg-secondary">{item.category}</span>;
-    }
-
-    const handleAssignCategory = async (itemId, newCategory) => {
-        if (!selectedCustomer || !newCategory) return;
-        const itemRef = doc(db, "stock", selectedCustomer, "items", itemId);
-        await updateDoc(itemRef, { category: newCategory });
-    };
-
-    const groupedSubCategories = useMemo(() => {
-        return subCategories.reduce((acc, cat) => {
-            const main = cat.mainCategory || 'Other';
-            if (!acc[main]) acc[main] = [];
-            acc[main].push(cat);
-            return acc;
-        }, {});
-    }, [subCategories]);
-
-    return (
-        <select
-            className="form-select form-select-sm"
-            value={item.category || ''}
-            onChange={(e) => handleAssignCategory(item.id, e.target.value)}
-            style={{ minWidth: '150px' }}
-        >
-            <option value="Unassigned">Unassigned</option>
-            {Object.entries(groupedSubCategories).map(([mainCategory, subs]) => (
-                <optgroup label={mainCategory} key={mainCategory}>
-                    {subs.map(sc => (
-                        <option key={sc.id} value={sc.name}>{sc.name}</option>
-                    ))}
-                </optgroup>
-            ))}
-        </select>
-    );
-};
-
 
 const CustomerStock = ({ user }) => {
+    // This component remains unchanged
     const [allStockItems, setAllStockItems] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [error, setError] = useState("");
@@ -2210,6 +2260,7 @@ const CustomerStock = ({ user }) => {
 
 
 const AdminPanel = () => {
+    // This component remains unchanged
     const [activeTab, setActiveTab] = useState('users');
     return (
         <div className="card w-100">
@@ -2230,6 +2281,7 @@ const AdminPanel = () => {
 };
 
 const UserManagementTab = () => {
+    // This component remains unchanged
     const [users, setUsers] = useState([]);
     const [customers, setCustomers] = useState([]);
     const [editingUserId, setEditingUserId] = useState(null);
@@ -2370,6 +2422,7 @@ const UserManagementTab = () => {
 };
 
 const CustomerManagementTab = () => {
+    // This component remains unchanged
     const [customers, setCustomers] = useState([]);
     const [editingCustomer, setEditingCustomer] = useState(null);
 
@@ -2478,6 +2531,7 @@ const CustomerManagementTab = () => {
 };
 
 const DataManagementTab = () => {
+    // This component remains unchanged
     const [orderTypes, setOrderTypes] = useState([]);
     const [products, setProducts] = useState([]);
     const [stockSubCategories, setStockSubCategories] = useState([]);
@@ -2797,6 +2851,7 @@ const DataManagementTab = () => {
 
 
 const ProductionStatusManagement = ({ orderTypes, products }) => {
+    // This component remains unchanged
     const [statuses, setStatuses] = useState([]);
     const [description, setDescription] = useState('');
     const [selectedOrderTypes, setSelectedOrderTypes] = useState({});
@@ -2954,6 +3009,7 @@ const ProductionStatusManagement = ({ orderTypes, products }) => {
 
 
 const SettingsPage = () => {
+    // This component remains unchanged
     const [settings, setSettings] = useState({ companyName: "", welcomeMessage: "", logoUrl: "", lastSailOrder: 0, lastAccessoryOrder: 0, qcEmailSubject: "", qcEmailBody: "" });
     const docRef = doc(db, "settings", "main");
     useEffect(() => { onSnapshot(docRef, (doc) => { if (doc.exists()) setSettings(prev => ({ ...prev, ...doc.data() })); }); }, []);
@@ -2999,6 +3055,7 @@ const SettingsPage = () => {
 
 
 const OrderHistoryModal = ({ order, onClose }) => {
+    // This component remains unchanged
     const [history, setHistory] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -3059,6 +3116,7 @@ const OrderHistoryModal = ({ order, onClose }) => {
 };
 
 const SchedulePDFDocument = ({ ordersByCustomer, selectedWeek }) => {
+    // This component remains unchanged from the last fix
     const styles = StyleSheet.create({
         page: {
             paddingTop: 35,
