@@ -1682,8 +1682,10 @@ const CustomerStock = ({ user }) => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [stockSubCategories, setStockSubCategories] = useState([]);
     const [lastUploadDate, setLastUploadDate] = useState(null);
+    const [customerData, setCustomerData] = useState(null);
     const fileInputRef = useRef(null);
     const isAdmin = user.role === 'super_admin' || user.role === 'production';
+    const isCustomer = user.role === 'customer';
 
     useEffect(() => {
         if (isAdmin) {
@@ -1697,17 +1699,32 @@ const CustomerStock = ({ user }) => {
             onSnapshot(collection(db, "stockSubCategories"), snap => {
                 setStockSubCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             });
+        } else if (isCustomer && user.customerCompanyId) {
+             const unsub = onSnapshot(doc(db, "customers", user.customerCompanyId), (docSnap) => {
+                if(docSnap.exists()){
+                    setCustomerData(docSnap.data());
+                }
+            });
+            return () => unsub();
         }
-    }, [isAdmin]);
+    }, [isAdmin, isCustomer, user.customerCompanyId]);
     
     useEffect(() => {
-        const customerData = customers.find(c => c.id === selectedCustomer);
-        if (customerData && customerData.lastStockUpdate) {
-            setLastUploadDate(customerData.lastStockUpdate.toDate().toLocaleDateString());
-        } else {
-            setLastUploadDate(null);
+        if (isAdmin) {
+            const currentCustomerData = customers.find(c => c.id === selectedCustomer);
+            if (currentCustomerData && currentCustomerData.lastStockUpdate) {
+                setLastUploadDate(currentCustomerData.lastStockUpdate.toDate().toLocaleDateString());
+            } else {
+                setLastUploadDate(null);
+            }
+        } else if (isCustomer && customerData) {
+            if (customerData.lastStockUpdate) {
+                 setLastUploadDate(customerData.lastStockUpdate.toDate().toLocaleDateString());
+            } else {
+                 setLastUploadDate(null);
+            }
         }
-    }, [selectedCustomer, customers]);
+    }, [selectedCustomer, customers, customerData, isAdmin, isCustomer]);
 
     useEffect(() => {
         if (!user) return;
@@ -1723,6 +1740,43 @@ const CustomerStock = ({ user }) => {
         return () => unsub();
     }, [user, selectedCustomer, isAdmin]);
     
+    const handleDeleteStock = async () => {
+        if (!selectedCustomer) {
+            alert("Please select a customer whose stock you want to delete.");
+            return;
+        }
+
+        const customerName = customers.find(c => c.id === selectedCustomer)?.companyName || "the selected customer";
+        if (!window.confirm(`DANGER: Are you sure you want to delete ALL stock items for ${customerName}? This action cannot be undone.`)) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const stockCollectionRef = collection(db, "stock", selectedCustomer, "items");
+            const snapshot = await getDocs(stockCollectionRef);
+            
+            // Firebase allows a maximum of 500 operations per batch
+            const batchSize = 500;
+            for (let i = 0; i < snapshot.docs.length; i += batchSize) {
+                const batch = writeBatch(db);
+                const chunk = snapshot.docs.slice(i, i + batchSize);
+                chunk.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+            }
+
+            alert(`Successfully deleted all stock items for ${customerName}.`);
+
+        } catch (err) {
+            console.error("Error deleting stock:", err);
+            setError("Failed to delete stock. See console for details.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleUpload = async () => {
         if (!selectedCustomer) {
             setError("Please select a customer first.");
@@ -1740,7 +1794,6 @@ const CustomerStock = ({ user }) => {
         setLoading(true);
         setError("");
 
-        // Fetch existing stock to compare against
         const existingStockSnapshot = await getDocs(collection(db, "stock", selectedCustomer, "items"));
         const existingStockMap = new Map(existingStockSnapshot.docs.map(doc => [doc.id, doc.data()]));
 
@@ -1775,15 +1828,13 @@ const CustomerStock = ({ user }) => {
                         const existingItem = existingStockMap.get(partNo);
 
                         if (existingItem) {
-                            // Item exists: update it but preserve the category
                             batch.set(docRef, {
                                 PART_NO: partNo,
                                 DESCRIPTION: row.DESCRIPTION || '',
                                 TOTAL_QTY: row.TOTAL_QTY || 0,
-                            }, { merge: true }); // Use merge to avoid overwriting the category
+                            }, { merge: true });
                             updatedItemsCount++;
                         } else {
-                            // Item is new: add it with 'Unassigned' category
                             batch.set(docRef, {
                                 PART_NO: partNo,
                                 DESCRIPTION: row.DESCRIPTION || '',
@@ -1895,10 +1946,9 @@ const CustomerStock = ({ user }) => {
                                     {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
                                 </select>
                             </div>
-                             <div className="col-md-5">
+                             <div className="col-md-4">
                                 <label htmlFor="stock-file-upload" className="form-label">
                                     Upload Excel File
-                                    <small className="text-muted fw-normal ms-2">(Columns: PART_NO, DESCRIPTION, TOTAL_QTY)</small>
                                 </label>
                                 <input 
                                     type="file" 
@@ -1909,21 +1959,28 @@ const CustomerStock = ({ user }) => {
                                     accept=".xlsx, .xls"
                                 />
                             </div>
-                            <div className="col-md-3">
+                            <div className="col-md-2">
                                 <button onClick={handleUpload} className="btn btn-primary w-100" disabled={loading || !selectedCustomer || !selectedFile}>
                                     {loading ? 'Uploading...' : 'Upload Stock'}
+                                </button>
+                            </div>
+                            <div className="col-md-2">
+                                <button onClick={handleDeleteStock} className="btn btn-outline-danger w-100" disabled={loading || !selectedCustomer}>
+                                    {loading ? '...' : 'Delete All Stock'}
                                 </button>
                             </div>
                         </div>
                     </div>
                 )}
+                 {isCustomer && lastUploadDate && (
+                    <p className="text-muted mb-3">Stock data last updated on: {lastUploadDate}</p>
+                )}
                 
-                {/* Unassigned Items Panel */}
-                {isAdmin && groupedAndFilteredItems.unassigned.length > 0 && (
+                {groupedAndFilteredItems.unassigned.length > 0 && (
                     <div className="card mb-4 border-warning">
                         <div className="card-header bg-warning-subtle">
                             <h3 className="h5 mb-0">Unassigned Stock Items ({groupedAndFilteredItems.unassigned.length})</h3>
-                            <p className="mb-0 text-muted small">These new items need to be assigned a category below.</p>
+                           {isAdmin && <p className="mb-0 text-muted small">These new items need to be assigned a category below.</p>}
                         </div>
                         <div className="card-body p-0">
                             <div className="table-responsive">
@@ -1942,7 +1999,13 @@ const CustomerStock = ({ user }) => {
                                                 <td>{item.PART_NO}</td>
                                                 <td>{item.DESCRIPTION}</td>
                                                 <td>{item.TOTAL_QTY}</td>
-                                                <td><CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} /></td>
+                                                <td>
+                                                     {isAdmin ? (
+                                                        <CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} />
+                                                    ) : (
+                                                        <span className="badge bg-secondary">{item.category || 'Unassigned'}</span>
+                                                    )}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1969,7 +2032,7 @@ const CustomerStock = ({ user }) => {
                             {Object.entries({ "Sail Materials": groupedAndFilteredItems["Sail Materials"], "Sail Hardware": groupedAndFilteredItems["Sail Hardware"] }).map(([mainCategory, subCategories]) => (
                                 Object.keys(subCategories).length > 0 && (
                                     <React.Fragment key={mainCategory}>
-                                        <tr className="table-light"><th colSpan={isAdmin ? 4 : 3}>{mainCategory}</th></tr>
+                                        <tr className="table-light"><th colSpan="4">{mainCategory}</th></tr>
                                         {Object.entries(subCategories).sort(([a],[b])=>a.localeCompare(b)).map(([subCategory, items]) => (
                                             items.map(item => (
                                                 <tr key={item.id}>
