@@ -560,22 +560,32 @@ const Dashboard = ({ user }) => {
         return 'bg-primary';
     };
 
+    // MODIFIED: useEffect to fetch data with client-side filtering for customers
     useEffect(() => {
         const isCustomer = user.role === 'customer';
-        let constraints = [where("deliveryWeek", "==", currentWeek)];
-        
+        let q;
+
         if (isCustomer) {
             if (!user.customerCompanyId) {
                 setIsLoading(false);
                 setWeeklyOrders([]);
                 return;
             }
-            constraints.push(where("customerId", "==", user.customerCompanyId));
+            // Simplified query for customers - gets all their orders
+            q = query(collection(db, "orders"), where("customerId", "==", user.customerCompanyId));
+        } else {
+            // Original query for admin/production - gets orders for a specific week
+            q = query(collection(db, "orders"), where("deliveryWeek", "==", currentWeek));
         }
 
-        const q = query(collection(db, "orders"), ...constraints);
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            let ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // For customers, filter by week on the client side
+            if (isCustomer) {
+                ordersData = ordersData.filter(order => order.deliveryWeek === currentWeek);
+            }
+
             setWeeklyOrders(ordersData);
             setIsLoading(false);
         }, (error) => {
@@ -586,7 +596,7 @@ const Dashboard = ({ user }) => {
         return () => unsubscribe();
     }, [user, currentWeek]);
 
-    // MODIFIED: Added useMemo to group orders by customer for non-customer roles
+
     const ordersByCustomer = useMemo(() => {
         if (user.role === 'customer' || !weeklyOrders) return {};
         return weeklyOrders.reduce((acc, order) => {
@@ -615,14 +625,12 @@ const Dashboard = ({ user }) => {
                                 <thead>
                                     <tr>
                                         <th>Aqua Order #</th>
-                                        {/* Show Customer column only if it's a flat list for customers */}
                                         {user.role === 'customer' && <th>Customer</th>}
                                         <th>Customer PO</th>
                                         <th>Product</th>
                                         <th>Status</th>
                                     </tr>
                                 </thead>
-                                {/* MODIFIED: Conditional rendering based on user role */}
                                 {user.role === 'customer' ? (
                                     <tbody>
                                         {weeklyOrders.map(order => (
@@ -636,7 +644,6 @@ const Dashboard = ({ user }) => {
                                         ))}
                                     </tbody>
                                 ) : (
-                                    /* Grouped view for admin/production */
                                     Object.keys(ordersByCustomer).sort().map(customerName => (
                                         <tbody key={customerName}>
                                             <tr className="table-light">
@@ -1020,32 +1027,34 @@ const OrderList = ({ user }) => {
     const entriesPerPage = 25;
     const isCustomer = user.role === 'customer';
 
+    // MODIFIED: useEffect to use a simplified query for customers
     useEffect(() => {
         if (!user) return;
         let q;
         if (isCustomer) { 
             if (!user.customerCompanyId) return;
-            q = query(collection(db, "orders"), where("customerId", "==", user.customerCompanyId), orderBy("createdAt", "desc"));
+            // Simplified query for customers to avoid needing a composite index
+            q = query(collection(db, "orders"), where("customerId", "==", user.customerCompanyId));
         } else { 
+            // Query for admin includes server-side sorting
             q = query(collection(db, "orders"), orderBy("createdAt", "desc")); 
         }
         const unsub = onSnapshot(q, snap => setOrders(snap.docs.map(d => ({id: d.id, ...d.data()}))));
         return () => unsub();
-    }, [user]);
+    }, [user, isCustomer]);
+
 
     // Reset to the first page when the filter changes
     useEffect(() => {
         setCurrentPage(1);
     }, [activeTab, searchTerm]);
 
-    // NEW: Helper function to extract the number from an order string like 'S123' or 'A123-A125'
     const parseOrderNumber = (orderString) => {
         if (!orderString) return 0;
-        const match = orderString.match(/\d+/); // Find the first sequence of digits
+        const match = orderString.match(/\d+/); 
         return match ? parseInt(match[0], 10) : 0;
     };
     
-    // MODIFIED: This memo now includes the numeric sort
     const categorizedOrders = useMemo(() => {
         let filtered;
         if (activeTab === 'sails') {
@@ -1056,15 +1065,13 @@ const OrderList = ({ user }) => {
             filtered = orders; // 'all' tab
         }
 
-        // Add sorting logic here
         return filtered.sort((a, b) => {
             const numA = parseOrderNumber(a.aquaOrderNumber);
             const numB = parseOrderNumber(b.aquaOrderNumber);
-            return numB - numA; // Sort in descending order to get newest on top
+            return numB - numA; 
         });
     }, [orders, activeTab]);
 
-    // 2. Then, filter by the search term
     const filteredOrders = useMemo(() => {
         if (!searchTerm) return categorizedOrders;
         const lowercasedFilter = searchTerm.toLowerCase();
@@ -1279,15 +1286,28 @@ const WeeklyScheduleView = ({ user }) => {
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
     const isCustomer = user.role === 'customer';
 
+    // MODIFIED: useEffect to use a simplified query for customers and client-side filtering
     useEffect(() => {
         if (!user) return;
-        let ordersQuery = query(collection(db, "orders"), where("status", "!=", "Cancelled"));
-        if(isCustomer) {
-             if (!user.customerCompanyId) return;
-            ordersQuery = query(ordersQuery, where("customerId", "==", user.customerCompanyId));
+        let ordersQuery;
+
+        if (isCustomer) {
+            if (!user.customerCompanyId) return;
+            // Simplified query for customers
+            ordersQuery = query(collection(db, "orders"), where("customerId", "==", user.customerCompanyId));
+        } else {
+            // Original query for admin/production
+            ordersQuery = query(collection(db, "orders"), where("status", "!=", "Cancelled"));
         }
+        
         const unsubOrders = onSnapshot(ordersQuery, (snap) => {
-            const ordersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            let ordersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            // For customers, filter out cancelled orders on the client
+            if (isCustomer) {
+                ordersData = ordersData.filter(order => order.status !== 'Cancelled');
+            }
+
             setAllOrders(ordersData);
             const weeks = [...new Set(ordersData.map(o => o.deliveryWeek).filter(Boolean))];
             weeks.sort();
@@ -1300,9 +1320,8 @@ const WeeklyScheduleView = ({ user }) => {
         });
 
         return () => { unsubOrders(); unsubStatuses(); };
-    }, [user]);
-    
-    // MODIFIED: Added defensive check to ensure allOrders is an array
+    }, [user, isCustomer]);
+
     const ordersByCustomer = useMemo(() => {
         if (!selectedWeek || !Array.isArray(allOrders)) return {};
         const weekOrders = allOrders.filter(o => o.deliveryWeek === selectedWeek && o.status?.toLowerCase() !== 'shipped');
@@ -1319,7 +1338,6 @@ const WeeklyScheduleView = ({ user }) => {
         return allOrders.filter(o => o.deliveryWeek === selectedWeek && o.status?.toLowerCase() === 'shipped');
     }, [selectedWeek, allOrders]);
 
-    // NEW: Memoize the PDF document to improve stability
     const schedulePdfDocument = useMemo(() => (
         <SchedulePDFDocument ordersByCustomer={ordersByCustomer} selectedWeek={selectedWeek} />
     ), [ordersByCustomer, selectedWeek]);
@@ -1497,6 +1515,11 @@ const OrderHistoryView = ({ user }) => {
         try {
             const constraints = [where("aquaOrderNumber", "==", searchQuery)];
             if (user.role === 'customer') {
+                if (!user.customerCompanyId) {
+                    setError("Customer account is not properly configured.");
+                    setIsLoading(false);
+                    return;
+                }
                 constraints.push(where("customerId", "==", user.customerCompanyId));
             }
             const orderQuery = query(collection(db, "orders"), ...constraints);
@@ -1563,21 +1586,38 @@ const AllActiveOrdersView = ({ user }) => {
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
     const isCustomer = user.role === 'customer';
 
+    // MODIFIED: useEffect to use a simplified query for customers and client-side filtering
     useEffect(() => {
         if (!user) return;
-        let q = query(collection(db, "orders"), where("status", "not-in", ["Shipped", "Cancelled"]));
+        let q;
+
         if (isCustomer) {
-             if (!user.customerCompanyId) return;
-            q = query(q, where("customerId", "==", user.customerCompanyId));
+            if (!user.customerCompanyId) {
+                setIsLoading(false);
+                setActiveOrders([]);
+                return;
+            };
+            // Simplified query for customers
+            q = query(collection(db, "orders"), where("customerId", "==", user.customerCompanyId));
+        } else {
+            // Original query for admin/production
+            q = query(collection(db, "orders"), where("status", "not-in", ["Shipped", "Cancelled"]));
         }
+        
         const unsub = onSnapshot(q, (snap) => {
-            setActiveOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            let activeOrdersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            
+            // For customers, filter for active orders on the client
+            if(isCustomer) {
+                activeOrdersData = activeOrdersData.filter(order => order.status !== "Shipped" && order.status !== "Cancelled");
+            }
+
+            setActiveOrders(activeOrdersData);
             setIsLoading(false);
         });
         return () => unsub();
-    }, [user]);
+    }, [user, isCustomer]);
 
-    // FIXED: Helper function to format a Date object into 'YYYY-MM-DD' without timezone conversion
     const toYYYYMMDD = (date) => {
         if (!date) return '';
         const d = new Date(date);
@@ -1664,10 +1704,8 @@ const AllActiveOrdersView = ({ user }) => {
                                     <td>{order.quantity}</td>
                                     <td>
                                         <DatePicker
-                                            // FIX 1: Parse the date string to ensure it's treated as local time
                                             selected={order.deliveryDate ? new Date(order.deliveryDate.replace(/-/g, '/')) : null}
                                             onChange={(date) => {
-                                                // FIX 2: Use the helper function to format the date correctly
                                                 const dateString = date ? toYYYYMMDD(date) : '';
                                                 handleDateChange(order.id, dateString);
                                             }}
