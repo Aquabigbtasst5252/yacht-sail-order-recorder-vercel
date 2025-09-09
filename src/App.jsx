@@ -78,7 +78,6 @@ const getCurrentWeekString = () => {
 
 const getWeekStringFromDate = (dateString) => {
     if (!dateString) return '';
-    // Create date in UTC to avoid timezone issues
     const date = new Date(dateString + 'T00:00:00Z');
     const year = date.getUTCFullYear();
     const firstDayOfYear = new Date(Date.UTC(year, 0, 1));
@@ -119,7 +118,6 @@ export default function App() {
     };
 
     useEffect(() => {
-        // Load XLSX library
         loadScript("https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js")
             .then(() => {
                 XLSX = window.XLSX;
@@ -166,7 +164,6 @@ export default function App() {
             unsubUserData = onSnapshot(doc(db, "users", user.uid), (userDoc) => {
                 const data = userDoc.data();
                 setUserData(data);
-                 // Always fetch settings if user is logged in
                 unsubSettings = onSnapshot(doc(db, "settings", "main"), (settingsDoc) => {
                     if (settingsDoc.exists()) setSettings(settingsDoc.data());
                 });
@@ -230,6 +227,7 @@ export default function App() {
                     case 'order-list': return <OrderList user={userData} settings={settings} />;
                     case 'planning': return <ProductionPage user={userData} />;
                     case 'stock': return <CustomerStock user={userData} />;
+                    case 'reports': return (isAdmin || isProduction) ? <ReportsPage /> : <Dashboard user={userData} />;
                     case 'settings': return isAdmin ? <SettingsPage /> : <Dashboard user={userData} />;
                     case 'admin': return isAdmin ? <AdminPanel /> : <Dashboard user={userData} />;
                     case 'dashboard': default: return <Dashboard user={userData} />;
@@ -292,14 +290,14 @@ const PublicFooter = () => (
 );
 
 const HomePage = ({ onLoginSuccess, settings }) => {
-    const [viewMode, setViewMode] = useState('login'); // 'login', 'signup', or 'reset'
+    const [viewMode, setViewMode] = useState('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [username, setUsername] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState(''); // For success messages
+    const [message, setMessage] = useState('');
 
     const clearMessages = () => {
         setError('');
@@ -314,7 +312,7 @@ const HomePage = ({ onLoginSuccess, settings }) => {
             await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
             if (viewMode === 'login') {
                 await signInWithEmailAndPassword(auth, email, password);
-            } else { // signup
+            } else {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 await updateProfile(userCredential.user, { displayName: username });
             }
@@ -350,7 +348,7 @@ const HomePage = ({ onLoginSuccess, settings }) => {
         try {
             await sendPasswordResetEmail(auth, email);
             setMessage("Password reset link sent! Please check your inbox.");
-            setViewMode('login'); // Switch back to the login view
+            setViewMode('login');
         } catch (err) {
             setError(err.message);
         } finally {
@@ -496,6 +494,10 @@ const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
                                 <li className="nav-item ms-3">
                                     <a className="nav-link" href="#" onClick={(e) => { e.preventDefault(); onNavigate('planning'); }}>Production Schedule</a>
                                 </li>
+                                {/* NEW NAVIGATION LINK */}
+                                <li className="nav-item ms-3">
+                                    <a className="nav-link" href="#" onClick={(e) => { e.preventDefault(); onNavigate('reports'); }}>Reports</a>
+                                </li>
                              </>
                         )}
                         {isCustomer && (
@@ -532,6 +534,8 @@ const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
                             {(isAdmin || isProduction) && <li><hr className="dropdown-divider" /></li>}
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('order-list'); }}>Order List</a></li>}
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('planning'); }}>Production Schedule</a></li>}
+                            {/* NEW DROPDOWN LINK */}
+                            {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('reports'); }}>Reports</a></li>}
                             
                             {isAdmin && <li><hr className="dropdown-divider" /></li>}
                             {isAdmin && <li><a className="dropdown-item fw-bold" href="#" onClick={(e) => { e.preventDefault(); onNavigate('admin'); }}>Admin Panel</a></li>}
@@ -859,7 +863,7 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
 
 const QcModal = ({ order, user, onClose }) => {
     const [photos, setPhotos] = useState([]);
-    const [uploads, setUploads] = useState({}); // { [fileName]: progress }
+    const [uploads, setUploads] = useState({});
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const fileInputRef = useRef(null);
@@ -914,10 +918,8 @@ const QcModal = ({ order, user, onClose }) => {
                     } catch (firestoreError) {
                         console.error("Error saving photo metadata to Firestore:", firestoreError);
                         setError(`Failed to save photo ${file.name}. Please check permissions and try again.`);
-                        // If saving fails, delete the orphaned photo from storage
                         await deleteObject(uploadTask.snapshot.ref);
                     } finally {
-                        // This runs whether it succeeds or fails
                         setUploads(prev => {
                             const newUploads = { ...prev };
                             delete newUploads[file.name];
@@ -1019,7 +1021,7 @@ const OrderList = ({ user }) => {
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState('all'); // 'all', 'sails', or 'accessories'
+    const [activeTab, setActiveTab] = useState('all');
     const entriesPerPage = 25;
     const isCustomer = user.role === 'customer';
 
@@ -1178,7 +1180,6 @@ const OrderList = ({ user }) => {
                         </tbody>
                     </table>
                 </div>
-                {/* Pagination Controls */}
                 <nav>
                     <ul className="pagination justify-content-center">
                         <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
@@ -1191,7 +1192,6 @@ const OrderList = ({ user }) => {
                 </nav>
             </div>
 
-            {/* Edit Order Modal */}
             {editingOrder && (
                  <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
                     <div className="modal-dialog modal-lg">
@@ -1219,7 +1219,6 @@ const OrderList = ({ user }) => {
                 </div>
             )}
             
-            {/* QC Photos Modal */}
             {qcOrder && (
                 <QcModal
                     order={qcOrder}
@@ -1240,7 +1239,7 @@ const OrderList = ({ user }) => {
 
 
 const ProductionPage = ({ user }) => {
-    const [activeTab, setActiveTab] = useState('schedule'); // schedule, history, allActive
+    const [activeTab, setActiveTab] = useState('schedule');
 
     return (
         <div className="card w-100">
@@ -1268,9 +1267,6 @@ const ProductionPage = ({ user }) => {
     );
 };
 
-// =========================================================================================
-// === MODIFIED WeeklyScheduleView: PDF Export removed to fix crash ========================
-// =========================================================================================
 const WeeklyScheduleView = ({ user }) => {
     const [allOrders, setAllOrders] = useState([]);
     const [productionStatuses, setProductionStatuses] = useState([]);
@@ -1556,16 +1552,11 @@ const OrderHistoryView = ({ user }) => {
     );
 };
 
-// =========================================================================================
-// === MODIFIED AllActiveOrdersView: PDF Export ADDED here =================================
-// =========================================================================================
 const AllActiveOrdersView = ({ user }) => {
     const [activeOrders, setActiveOrders] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
-    const [deliveryWeeks, setDeliveryWeeks] = useState([]);
-    const [selectedWeek, setSelectedWeek] = useState('');
     const isCustomer = user.role === 'customer';
 
     useEffect(() => {
@@ -1589,11 +1580,6 @@ const AllActiveOrdersView = ({ user }) => {
             if(isCustomer) {
                 activeOrdersData = activeOrdersData.filter(order => order.status !== "Shipped" && order.status !== "Cancelled");
             }
-
-            // Populate weeks dropdown from all active orders
-            const weeks = [...new Set(activeOrdersData.map(o => o.deliveryWeek).filter(Boolean))];
-            weeks.sort();
-            setDeliveryWeeks(weeks);
 
             setActiveOrders(activeOrdersData);
             setIsLoading(false);
@@ -1620,14 +1606,7 @@ const AllActiveOrdersView = ({ user }) => {
     };
 
     const groupedAndFilteredOrders = useMemo(() => {
-        let ordersToProcess = activeOrders;
-
-        // Filter by selected week if one is chosen
-        if (selectedWeek) {
-            ordersToProcess = ordersToProcess.filter(order => order.deliveryWeek === selectedWeek);
-        }
-
-        const filtered = ordersToProcess.filter(order => {
+        const filtered = activeOrders.filter(order => {
             if (!searchTerm) return true;
             const lowercasedFilter = searchTerm.toLowerCase();
             return Object.values(order).some(value =>
@@ -1647,7 +1626,7 @@ const AllActiveOrdersView = ({ user }) => {
         }
         
         return grouped;
-    }, [activeOrders, searchTerm, selectedWeek]);
+    }, [activeOrders, searchTerm]);
 
     if (isLoading) {
         return <div className="text-center"><div className="spinner-border" role="status"><span className="visually-hidden">Loading...</span></div></div>;
@@ -1655,25 +1634,9 @@ const AllActiveOrdersView = ({ user }) => {
 
     return (
         <div>
-            <div className="d-flex justify-content-between align-items-center mb-3">
-                {/* PDF Download Button */}
-                <PDFDownloadLink
-                    document={<SchedulePDFDocument ordersByCustomer={groupedAndFilteredOrders} selectedWeek={selectedWeek} />}
-                    fileName={`production_schedule_${selectedWeek || 'all'}.pdf`}
-                    className={`btn btn-secondary ${!selectedWeek ? 'disabled' : ''}`}
-                >
-                    {({ loading }) => (loading ? 'Loading...' : 'Export to PDF')}
-                </PDFDownloadLink>
-
-                <div className="d-flex gap-2">
-                    {/* Week Selector */}
-                    <select className="form-select" style={{minWidth: '200px'}} value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
-                        <option value="">Filter by Delivery Week...</option>
-                        {deliveryWeeks.map(week => <option key={week} value={week}>{week}</option>)}
-                    </select>
-
-                    {/* Search Input */}
-                    <input
+            <div className="d-flex justify-content-end mb-3">
+                <div className="col-md-4">
+                     <input
                         type="text"
                         className="form-control"
                         placeholder="Search active orders..."
@@ -1734,6 +1697,86 @@ const AllActiveOrdersView = ({ user }) => {
                     onClose={() => setViewingHistoryFor(null)}
                 />
             )}
+        </div>
+    );
+};
+
+// =========================================================================================
+// === NEW ReportsPage component ===========================================================
+// =========================================================================================
+const ReportsPage = () => {
+    const [allOrders, setAllOrders] = useState([]);
+    const [deliveryWeeks, setDeliveryWeeks] = useState([]);
+    const [selectedWeek, setSelectedWeek] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const ordersQuery = query(collection(db, "orders"), where("status", "!=", "Cancelled"));
+        const unsubscribe = onSnapshot(ordersQuery, (snap) => {
+            const ordersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setAllOrders(ordersData);
+
+            const weeks = [...new Set(ordersData.map(o => o.deliveryWeek).filter(Boolean))];
+            weeks.sort();
+            setDeliveryWeeks(weeks);
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    const ordersForPdf = useMemo(() => {
+        if (!selectedWeek) return {};
+
+        const weekOrders = allOrders.filter(o => o.deliveryWeek === selectedWeek);
+        
+        return weekOrders.reduce((acc, order) => {
+            const customer = order.customerCompanyName || 'Unknown Customer';
+            if (!acc[customer]) acc[customer] = [];
+            acc[customer].push(order);
+            return acc;
+        }, {});
+    }, [selectedWeek, allOrders]);
+
+    return (
+        <div className="row justify-content-center">
+            <div className="col-lg-6">
+                <div className="card">
+                    <div className="card-header">
+                        <h2 className="h4 mb-0">Generate Production Schedule Report</h2>
+                    </div>
+                    <div className="card-body text-center">
+                        <p className="card-text text-muted">
+                            Select a delivery week to generate and download the production schedule as a PDF file.
+                        </p>
+                        <div className="my-4">
+                            <label htmlFor="week-select" className="form-label fw-bold">Delivery Week</label>
+                            <select
+                                id="week-select"
+                                className="form-select form-select-lg"
+                                value={selectedWeek}
+                                onChange={(e) => setSelectedWeek(e.target.value)}
+                                disabled={isLoading}
+                            >
+                                <option value="">{isLoading ? "Loading weeks..." : "Choose a week..."}</option>
+                                {deliveryWeeks.map(week => <option key={week} value={week}>{week}</option>)}
+                            </select>
+                        </div>
+
+                        <PDFDownloadLink
+                            document={<SchedulePDFDocument ordersByCustomer={ordersForPdf} selectedWeek={selectedWeek} />}
+                            fileName={selectedWeek ? `production_schedule_${selectedWeek}.pdf` : 'production_schedule.pdf'}
+                            // The 'disabled' class is only for visual styling; the link is unclickable if `!selectedWeek` is true.
+                            className={`btn btn-primary btn-lg ${!selectedWeek ? 'disabled' : ''}`}
+                            aria-disabled={!selectedWeek}
+                            tabIndex={!selectedWeek ? -1 : undefined}
+                            style={!selectedWeek ? { pointerEvents: 'none' } : {}}
+                        >
+                            {({ loading }) => (loading ? 'Generating PDF...' : 'Export to PDF')}
+                        </PDFDownloadLink>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
@@ -2439,7 +2482,6 @@ const DataManagementTab = () => {
     const [products, setProducts] = useState([]);
     const [stockSubCategories, setStockSubCategories] = useState([]);
     
-    // State for forms
     const [newOrderTypeName, setNewOrderTypeName] = useState('');
     const [newProductName, setNewProductName] = useState('');
     const [newProductOrderType, setNewProductOrderType] = useState('');
@@ -2956,7 +2998,6 @@ const SettingsPage = () => {
 };
 
 
-// --- Helper Component for Order History Modal ---
 const OrderHistoryModal = ({ order, onClose }) => {
     const [history, setHistory] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -3017,9 +3058,6 @@ const OrderHistoryModal = ({ order, onClose }) => {
     );
 };
 
-// =========================================================================================
-// === MODIFIED SchedulePDFDocument: Added repeating headers and footer ====================
-// =========================================================================================
 const SchedulePDFDocument = ({ ordersByCustomer, selectedWeek }) => {
     const styles = StyleSheet.create({
         page: {
