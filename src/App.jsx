@@ -1926,30 +1926,31 @@ const CustomerStock = ({ user }) => {
     }, [selectedCustomer, customers, customerData, isAdmin, isCustomer]);
 
     useEffect(() => {
-        // === FIX STARTS HERE ===
-        // This effect now has stronger guards to prevent crashes.
         if (!user) return;
-
         const customerId = isAdmin ? selectedCustomer : user.customerCompanyId;
         
-        // Don't try to fetch data if there's no customer ID available yet.
+        // If there's no customer ID, ensure stock is cleared and stop.
         if (!customerId) {
             setAllStockItems([]);
             return;
         }
+        
+        // === FIX STARTS HERE ===
+        // Immediately clear previous items before fetching new ones.
+        // This prevents rendering with stale data from the previously selected customer.
+        setAllStockItems([]);
+        // === FIX ENDS HERE ===
 
         const unsub = onSnapshot(collection(db, "stock", customerId, "items"), (snapshot) => {
             setAllStockItems(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
         }, (err) => {
             console.error("Error fetching stock data:", err);
-            // It's also good practice to clear the items if an error occurs.
-            setAllStockItems([]);
+            setAllStockItems([]); // Also clear on error
         });
 
         // Cleanup function for when the component unmounts or the customerId changes.
         return () => unsub();
-        // === FIX ENDS HERE ===
-    }, [user, selectedCustomer, isAdmin]);
+    }, [user, selectedCustomer, isAdmin, isCustomer]); // Added isCustomer for completeness
     
     const handleDeleteStock = async () => {
         if (!selectedCustomer) {
