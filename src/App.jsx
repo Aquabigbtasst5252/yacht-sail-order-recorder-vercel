@@ -1872,7 +1872,6 @@ const ReportsPage = () => {
 
 
 const CustomerStock = ({ user }) => {
-    // This component remains unchanged
     const [allStockItems, setAllStockItems] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [error, setError] = useState("");
@@ -1927,8 +1926,13 @@ const CustomerStock = ({ user }) => {
     }, [selectedCustomer, customers, customerData, isAdmin, isCustomer]);
 
     useEffect(() => {
+        // === FIX STARTS HERE ===
+        // This effect now has stronger guards to prevent crashes.
         if (!user) return;
+
         const customerId = isAdmin ? selectedCustomer : user.customerCompanyId;
+        
+        // Don't try to fetch data if there's no customer ID available yet.
         if (!customerId) {
             setAllStockItems([]);
             return;
@@ -1936,8 +1940,15 @@ const CustomerStock = ({ user }) => {
 
         const unsub = onSnapshot(collection(db, "stock", customerId, "items"), (snapshot) => {
             setAllStockItems(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
-        }, (err) => console.error("Error fetching stock data:", err));
+        }, (err) => {
+            console.error("Error fetching stock data:", err);
+            // It's also good practice to clear the items if an error occurs.
+            setAllStockItems([]);
+        });
+
+        // Cleanup function for when the component unmounts or the customerId changes.
         return () => unsub();
+        // === FIX ENDS HERE ===
     }, [user, selectedCustomer, isAdmin]);
     
     const handleDeleteStock = async () => {
@@ -2257,7 +2268,6 @@ const CustomerStock = ({ user }) => {
         </div>
     );
 };
-
 
 const AdminPanel = () => {
     // This component remains unchanged
