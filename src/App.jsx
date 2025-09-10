@@ -1935,11 +1935,11 @@ const CustomerStock = ({ user }) => {
             return;
         }
         
-        // === FIX STARTS HERE ===
+        // === FIX APPLIED HERE ===
         // Immediately clear previous items before fetching new ones.
         // This prevents rendering with stale data from the previously selected customer.
         setAllStockItems([]);
-        // === FIX ENDS HERE ===
+        // ========================
 
         const unsub = onSnapshot(collection(db, "stock", customerId, "items"), (snapshot) => {
             setAllStockItems(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
@@ -1950,7 +1950,7 @@ const CustomerStock = ({ user }) => {
 
         // Cleanup function for when the component unmounts or the customerId changes.
         return () => unsub();
-    }, [user, selectedCustomer, isAdmin, isCustomer]); // Added isCustomer for completeness
+    }, [user, selectedCustomer, isAdmin, isCustomer]);
     
     const handleDeleteStock = async () => {
         if (!selectedCustomer) {
