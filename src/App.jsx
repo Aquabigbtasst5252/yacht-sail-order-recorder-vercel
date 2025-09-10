@@ -1870,12 +1870,43 @@ const ReportsPage = () => {
     );
 };
 
+// --- Add this new component to your file ---
+const CategorySelector = ({ item, selectedCustomer, subCategories, isAdmin }) => {
+    const handleCategoryChange = async (newCategory) => {
+        if (!selectedCustomer || !item.id) return;
+        const itemRef = doc(db, "stock", selectedCustomer, "items", item.id);
+        try {
+            await updateDoc(itemRef, { category: newCategory });
+        } catch (error) {
+            console.error("Failed to update category:", error);
+        }
+    };
+
+    if (!isAdmin) {
+        return <span className="badge bg-secondary">{item.category || 'Unassigned'}</span>;
+    }
+
+    return (
+        <select 
+            className="form-select form-select-sm"
+            value={item.category || 'Unassigned'}
+            onChange={(e) => handleCategoryChange(e.target.value)}
+            style={{ minWidth: '150px' }}
+        >
+            <option value="Unassigned">Unassigned</option>
+            {subCategories.map(cat => (
+                <option key={cat.id} value={cat.name}>{cat.name}</option>
+            ))}
+        </select>
+    );
+};
 
 const CustomerStock = ({ user }) => {
     const [allStockItems, setAllStockItems] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [error, setError] = useState("");
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(false); // For uploads/deletes
+    const [isListLoading, setIsListLoading] = useState(true); // For fetching the list
     const [customers, setCustomers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState('');
     const [selectedFile, setSelectedFile] = useState(null);
@@ -1891,9 +1922,6 @@ const CustomerStock = ({ user }) => {
             onSnapshot(collection(db, "customers"), snap => {
                 const customerList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 setCustomers(customerList);
-                if (!selectedCustomer && customerList.length > 0) {
-                    setSelectedCustomer(customerList[0].id);
-                }
             });
             onSnapshot(collection(db, "stockSubCategories"), snap => {
                 setStockSubCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -1929,26 +1957,22 @@ const CustomerStock = ({ user }) => {
         if (!user) return;
         const customerId = isAdmin ? selectedCustomer : user.customerCompanyId;
         
-        // If there's no customer ID, ensure stock is cleared and stop.
         if (!customerId) {
+            setIsListLoading(false);
             setAllStockItems([]);
             return;
         }
         
-        // === FIX APPLIED HERE ===
-        // Immediately clear previous items before fetching new ones.
-        // This prevents rendering with stale data from the previously selected customer.
-        setAllStockItems([]);
-        // ========================
-
+        setIsListLoading(true); // Start loading
         const unsub = onSnapshot(collection(db, "stock", customerId, "items"), (snapshot) => {
             setAllStockItems(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
+            setIsListLoading(false); // Stop loading on success
         }, (err) => {
             console.error("Error fetching stock data:", err);
-            setAllStockItems([]); // Also clear on error
+            setError("Could not load stock data.");
+            setIsListLoading(false); // Stop loading on error
         });
 
-        // Cleanup function for when the component unmounts or the customerId changes.
         return () => unsub();
     }, [user, selectedCustomer, isAdmin, isCustomer]);
     
@@ -2078,6 +2102,8 @@ const CustomerStock = ({ user }) => {
     };
 
     const groupedAndFilteredItems = useMemo(() => {
+        if (isListLoading) return { unassigned: [], "Sail Materials": {}, "Sail Hardware": {} };
+
         const subCategoryMap = stockSubCategories.reduce((acc, cat) => {
             acc[cat.name] = cat.mainCategory;
             return acc;
@@ -2120,7 +2146,7 @@ const CustomerStock = ({ user }) => {
         }
         
         return grouped;
-    }, [allStockItems, stockSubCategories, searchTerm]);
+    }, [allStockItems, stockSubCategories, searchTerm, isListLoading]);
 
     return (
         <div className="card w-100">
@@ -2183,92 +2209,95 @@ const CustomerStock = ({ user }) => {
                         </div>
                     </div>
                 )}
-                 {isCustomer && lastUploadDate && (
+                {isCustomer && lastUploadDate && (
                     <p className="text-muted mb-3">Stock data last updated on: {lastUploadDate}</p>
                 )}
                 
-                {groupedAndFilteredItems.unassigned.length > 0 && (
-                    <div className="card mb-4 border-warning">
-                        <div className="card-header bg-warning-subtle">
-                            <h3 className="h5 mb-0">Unassigned Stock Items ({groupedAndFilteredItems.unassigned.length})</h3>
-                           {isAdmin && <p className="mb-0 text-muted small">These new items need to be assigned a category below.</p>}
-                        </div>
-                        <div className="card-body p-0">
-                            <div className="table-responsive">
-                                <table className="table table-sm table-hover mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>PART_NO</th>
-                                            <th>DESCRIPTION</th>
-                                            <th>TOTAL_QTY</th>
-                                            <th>Category</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {groupedAndFilteredItems.unassigned.map(item => (
-                                            <tr key={item.id}>
-                                                <td>{item.PART_NO}</td>
-                                                <td>{item.DESCRIPTION}</td>
-                                                <td>{item.TOTAL_QTY}</td>
-                                                <td>
-                                                     {isAdmin ? (
-                                                        <CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} />
-                                                    ) : (
-                                                        <span className="badge bg-secondary">{item.category || 'Unassigned'}</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                {isListLoading ? (
+                    <div className="text-center p-5">
+                        <div className="spinner-border" role="status">
+                            <span className="visually-hidden">Loading...</span>
                         </div>
                     </div>
-                )}
-
-
-                <h3 className="h5 mb-3 mt-4">Categorized Stock</h3>
-                <div className="table-responsive">
-                    <table className="table table-sm table-hover table-bordered">
-                        <thead>
-                            <tr>
-                                <th>PART_NO</th>
-                                <th>DESCRIPTION</th>
-                                <th>TOTAL_QTY</th>
-                                <th>Category</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {Object.entries({ "Sail Materials": groupedAndFilteredItems["Sail Materials"], "Sail Hardware": groupedAndFilteredItems["Sail Hardware"] }).map(([mainCategory, subCategories]) => (
-                                Object.keys(subCategories).length > 0 && (
-                                    <React.Fragment key={mainCategory}>
-                                        <tr className="table-light"><th colSpan="4">{mainCategory}</th></tr>
-                                        {Object.entries(subCategories).sort(([a],[b])=>a.localeCompare(b)).map(([subCategory, items]) => (
-                                            items.map(item => (
-                                                <tr key={item.id}>
-                                                    <td>{item.PART_NO}</td>
-                                                    <td>{item.DESCRIPTION}</td>
-                                                    <td>{item.TOTAL_QTY}</td>
-                                                    <td>
-                                                        {isAdmin ? (
-                                                            <CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} />
-                                                        ) : (
-                                                            <span className="badge bg-secondary">{item.category || 'Unassigned'}</span>
-                                                        )}
-                                                    </td>
+                ) : (
+                    <>
+                        {groupedAndFilteredItems.unassigned.length > 0 && (
+                            <div className="card mb-4 border-warning">
+                                <div className="card-header bg-warning-subtle">
+                                    <h3 className="h5 mb-0">Unassigned Stock Items ({groupedAndFilteredItems.unassigned.length})</h3>
+                                {isAdmin && <p className="mb-0 text-muted small">These new items need to be assigned a category below.</p>}
+                                </div>
+                                <div className="card-body p-0">
+                                    <div className="table-responsive">
+                                        <table className="table table-sm table-hover mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>PART_NO</th>
+                                                    <th>DESCRIPTION</th>
+                                                    <th>TOTAL_QTY</th>
+                                                    <th>Category</th>
                                                 </tr>
-                                            ))
-                                        ))}
-                                    </React.Fragment>
-                                )
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                                            </thead>
+                                            <tbody>
+                                                {groupedAndFilteredItems.unassigned.map(item => (
+                                                    <tr key={item.id}>
+                                                        <td>{item.PART_NO}</td>
+                                                        <td>{item.DESCRIPTION}</td>
+                                                        <td>{item.TOTAL_QTY}</td>
+                                                        <td>
+                                                            <CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} />
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+
+                        <h3 className="h5 mb-3 mt-4">Categorized Stock</h3>
+                        <div className="table-responsive">
+                            <table className="table table-sm table-hover table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>PART_NO</th>
+                                        <th>DESCRIPTION</th>
+                                        <th>TOTAL_QTY</th>
+                                        <th>Category</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {Object.entries({ "Sail Materials": groupedAndFilteredItems["Sail Materials"], "Sail Hardware": groupedAndFilteredItems["Sail Hardware"] }).map(([mainCategory, subCategories]) => (
+                                        (subCategories && Object.keys(subCategories).length > 0) && (
+                                            <React.Fragment key={mainCategory}>
+                                                <tr className="table-light"><th colSpan="4">{mainCategory}</th></tr>
+                                                {Object.entries(subCategories).sort(([a],[b])=>a.localeCompare(b)).map(([subCategory, items]) => (
+                                                    items.map(item => (
+                                                        <tr key={item.id}>
+                                                            <td>{item.PART_NO}</td>
+                                                            <td>{item.DESCRIPTION}</td>
+                                                            <td>{item.TOTAL_QTY}</td>
+                                                            <td>
+                                                                <CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} />
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                ))}
+                                            </React.Fragment>
+                                        )
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
 };
+
 
 const AdminPanel = () => {
     // This component remains unchanged
