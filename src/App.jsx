@@ -1918,22 +1918,33 @@ const CustomerStock = ({ user }) => {
     const isCustomer = user.role === 'customer';
 
     useEffect(() => {
+        // Sub-categories are needed for grouping in both admin and customer views.
+        const unsubSubCategories = onSnapshot(collection(db, "stockSubCategories"), snap => {
+            setStockSubCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+
+        let otherUnsub = () => {}; // No-op function for cleanup
+
         if (isAdmin) {
-            onSnapshot(collection(db, "customers"), snap => {
+            // Admins need the full customer list
+            otherUnsub = onSnapshot(collection(db, "customers"), snap => {
                 const customerList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 setCustomers(customerList);
             });
-            onSnapshot(collection(db, "stockSubCategories"), snap => {
-                setStockSubCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            });
         } else if (isCustomer && user.customerCompanyId) {
-             const unsub = onSnapshot(doc(db, "customers", user.customerCompanyId), (docSnap) => {
+            // Customers need their own company data (for last update date)
+            otherUnsub = onSnapshot(doc(db, "customers", user.customerCompanyId), (docSnap) => {
                 if(docSnap.exists()){
                     setCustomerData(docSnap.data());
                 }
             });
-            return () => unsub();
         }
+
+        // Return a cleanup function that unsubscribes from all active listeners
+        return () => {
+            unsubSubCategories();
+            otherUnsub();
+        };
     }, [isAdmin, isCustomer, user.customerCompanyId]);
     
     useEffect(() => {
@@ -2234,7 +2245,7 @@ const CustomerStock = ({ user }) => {
                                                 <tr>
                                                     <th>PART_NO</th>
                                                     <th>DESCRIPTION</th>
-                                                    <th>TOTAL_QTY</th>
+                                                    <th className="text-center">TOTAL_QTY</th>
                                                     <th>Category</th>
                                                 </tr>
                                             </thead>
@@ -2243,7 +2254,7 @@ const CustomerStock = ({ user }) => {
                                                     <tr key={item.id}>
                                                         <td>{item.PART_NO}</td>
                                                         <td>{item.DESCRIPTION}</td>
-                                                        <td>{item.TOTAL_QTY}</td>
+                                                        <td className="text-center">{item.TOTAL_QTY}</td>
                                                         <td>
                                                             <CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} />
                                                         </td>
@@ -2264,7 +2275,7 @@ const CustomerStock = ({ user }) => {
                                     <tr>
                                         <th>PART_NO</th>
                                         <th>DESCRIPTION</th>
-                                        <th>TOTAL_QTY</th>
+                                        <th className="text-center">TOTAL_QTY</th>
                                         <th>Category</th>
                                     </tr>
                                 </thead>
@@ -2274,16 +2285,21 @@ const CustomerStock = ({ user }) => {
                                             <React.Fragment key={mainCategory}>
                                                 <tr className="table-light"><th colSpan="4">{mainCategory}</th></tr>
                                                 {Object.entries(subCategories).sort(([a],[b])=>a.localeCompare(b)).map(([subCategory, items]) => (
-                                                    items.map(item => (
-                                                        <tr key={item.id}>
-                                                            <td>{item.PART_NO}</td>
-                                                            <td>{item.DESCRIPTION}</td>
-                                                            <td>{item.TOTAL_QTY}</td>
-                                                            <td>
-                                                                <CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} />
-                                                            </td>
+                                                    <React.Fragment key={subCategory}>
+                                                        <tr className="bg-body-tertiary">
+                                                            <td colSpan="4" className="fw-bold ps-3">{subCategory}</td>
                                                         </tr>
-                                                    ))
+                                                        {items.map(item => (
+                                                            <tr key={item.id}>
+                                                                <td>{item.PART_NO}</td>
+                                                                <td>{item.DESCRIPTION}</td>
+                                                                <td className="text-center">{item.TOTAL_QTY}</td>
+                                                                <td>
+                                                                    <CategorySelector item={item} selectedCustomer={selectedCustomer} subCategories={stockSubCategories} isAdmin={isAdmin} />
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </React.Fragment>
                                                 ))}
                                             </React.Fragment>
                                         )
