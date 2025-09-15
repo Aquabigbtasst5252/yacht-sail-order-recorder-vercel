@@ -3,6 +3,7 @@ import Select from 'react-select';
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 
 // --- Firebase SDK Imports ---
@@ -243,7 +244,12 @@ export default function App() {
 
         return <div className="vh-100 d-flex align-items-center justify-content-center"><p className="text-danger">An unexpected error occurred.</p></div>;
     };
-    return <PageContent />;
+     return (
+        <>
+            <PageContent />
+            <SpeedInsights /> 
+        </>
+    );
 }
 
 // --- Screens & Major Components ---
@@ -3282,5 +3288,6 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeek }) => {
                 </View>
             </Page>
         </Document>
+       
     );
 };
