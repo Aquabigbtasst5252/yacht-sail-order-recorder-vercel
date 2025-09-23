@@ -37,7 +37,8 @@ const IhcDetailsModal = ({ order, user, onClose }) => {
         if (files.length === 0) return;
 
         files.forEach(file => {
-            const fileNameWithTimestamp = `${Date.now()}-${file.name}`;
+            const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const fileNameWithTimestamp = `${Date.now()}-${sanitizedFileName}`;
             const storageRef = ref(storage, `ihc-stickers/${order.id}/${fileNameWithTimestamp}`);
             const uploadTask = uploadBytesResumable(storageRef, file);
 
