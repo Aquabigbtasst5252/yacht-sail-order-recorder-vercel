@@ -1,7 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { db, storage } from '../../firebase.js';
-import { doc, updateDoc, onSnapshot, arrayUnion } from "firebase/firestore";
+import {
+    doc,
+    updateDoc,
+    onSnapshot,
+    collection,
+    addDoc,
+    serverTimestamp,
+    query,
+    orderBy,
+    deleteDoc
+} from "firebase/firestore";
 import { 
     ref, 
     uploadBytesResumable, 
@@ -19,17 +29,28 @@ const IhcDetailsModal = ({ order, user, onClose }) => {
     const fileInputRef = useRef(null);
 
     useEffect(() => {
+        const q = query(collection(db, "orders", order.id, "ihcStickerImages"), orderBy("createdAt", "desc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setPhotos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setIsLoading(false);
+        }, (err) => {
+            console.error("Error fetching IHC photos:", err);
+            setIsLoading(false);
+        });
+
         const orderRef = doc(db, "orders", order.id);
-        const unsubscribe = onSnapshot(orderRef, (docSnap) => {
+        const unsubscribeOrder = onSnapshot(orderRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 setIhcSerialNumber(data.ihcSerialNumber || '');
                 setIhcRoyaltyNumber(data.ihcRoyaltyNumber || '');
-                setPhotos(data.ihcStickerImages || []);
             }
-            setIsLoading(false);
         });
-        return () => unsubscribe();
+
+        return () => {
+            unsubscribe();
+            unsubscribeOrder();
+        };
     }, [order.id]);
 
     const handleFileSelect = (e) => {
@@ -37,8 +58,7 @@ const IhcDetailsModal = ({ order, user, onClose }) => {
         if (files.length === 0) return;
 
         files.forEach(file => {
-            const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-            const fileNameWithTimestamp = `${Date.now()}-${sanitizedFileName}`;
+            const fileNameWithTimestamp = `${Date.now()}-${file.name}`;
             const storageRef = ref(storage, `ihc-stickers/${order.id}/${fileNameWithTimestamp}`);
             const uploadTask = uploadBytesResumable(storageRef, file);
 
@@ -48,6 +68,7 @@ const IhcDetailsModal = ({ order, user, onClose }) => {
                     setUploads(prev => ({ ...prev, [file.name]: progress }));
                 },
                 (uploadError) => {
+                    console.error(`Upload failed for ${file.name}:`, uploadError);
                     toast.error(`Upload failed for ${file.name}.`);
                     setUploads(prev => {
                         const newUploads = { ...prev };
@@ -58,18 +79,16 @@ const IhcDetailsModal = ({ order, user, onClose }) => {
                 async () => {
                     try {
                         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                        const newPhoto = {
+                        await addDoc(collection(db, "orders", order.id, "ihcStickerImages"), {
                             url: downloadURL,
                             fileName: file.name,
                             fullPath: uploadTask.snapshot.ref.fullPath,
                             uploadedBy: user.name,
-                        };
-                        // ATOMIC UPDATE: Safely add the new photo to the array in Firestore
-                        await updateDoc(doc(db, "orders", order.id), {
-                            ihcStickerImages: arrayUnion(newPhoto)
+                            createdAt: serverTimestamp()
                         });
-                        toast.success("Sticker image uploaded.");
+                        toast.success(`${file.name} uploaded.`);
                     } catch (firestoreError) {
+                        console.error("Error saving photo metadata:", firestoreError);
                         toast.error(`Failed to save photo ${file.name}.`);
                         await deleteObject(uploadTask.snapshot.ref);
                     } finally {
@@ -113,12 +132,10 @@ const IhcDetailsModal = ({ order, user, onClose }) => {
     const handleDelete = async (photoToDelete) => {
         try {
             await deleteObject(ref(storage, photoToDelete.fullPath));
-            const updatedPhotos = photos.filter(p => p.fullPath !== photoToDelete.fullPath);
-            await updateDoc(doc(db, "orders", order.id), {
-                ihcStickerImages: updatedPhotos
-            });
+            await deleteDoc(doc(db, "orders", order.id, "ihcStickerImages", photoToDelete.id));
             toast.success("Sticker image deleted.");
         } catch (err) {
+            console.error("Error deleting photo:", err);
             toast.error("Failed to delete photo.");
         }
     };
