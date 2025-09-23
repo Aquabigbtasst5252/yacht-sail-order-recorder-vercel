@@ -137,6 +137,40 @@ const OrderList = ({ user }) => {
         toast.success("Order updated successfully.");
         setEditingOrder(null);
     };
+
+    const handleExport = () => {
+        if (typeof window.XLSX === 'undefined') {
+            toast.error("Excel export library is not available.");
+            return;
+        }
+
+        const sailOrders = orders.filter(o => o.orderTypeName?.toLowerCase() === 'sail');
+        const accessoryOrders = orders.filter(o => o.orderTypeName?.toLowerCase() !== 'sail');
+
+        const formatOrders = (orderData) => orderData.map(o => ({
+            "Aqua Order No": o.aquaOrderNumber,
+            "Customer": o.customerCompanyName,
+            "Customer PO": o.customerPO,
+            "IFS Order No": o.ifsOrderNo,
+            "Product": o.productName,
+            "Material": o.material,
+            "Size": o.size,
+            "Quantity": o.quantity,
+            "Status": o.status,
+            "Is IHC": o.isIHC ? "Yes" : "No",
+            "Created Date": o.createdAt?.toDate().toLocaleDateString() || 'N/A',
+        }));
+
+        const sailSheet = window.XLSX.utils.json_to_sheet(formatOrders(sailOrders));
+        const accessorySheet = window.XLSX.utils.json_to_sheet(formatOrders(accessoryOrders));
+
+        const workbook = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(workbook, sailSheet, "Sails");
+        window.XLSX.utils.book_append_sheet(workbook, accessorySheet, "Accessories");
+
+        window.XLSX.writeFile(workbook, "AllOrders.xlsx");
+        toast.success("Exporting orders to Excel.");
+    };
     
     const indexOfLastEntry = currentPage * entriesPerPage;
     const indexOfFirstEntry = indexOfLastEntry - entriesPerPage;
@@ -160,7 +194,7 @@ const OrderList = ({ user }) => {
                         <button className={`nav-link ${activeTab === 'accessories' ? 'active' : ''}`} onClick={() => setActiveTab('accessories')}>Accessories</button>
                     </li>
                 </ul>
-                 <div className="col-md-4">
+                 <div className="d-flex gap-2">
                     <input
                         type="text"
                         className="form-control"
@@ -168,6 +202,9 @@ const OrderList = ({ user }) => {
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
+                    {!isCustomer && (
+                        <button className="btn btn-success" onClick={handleExport}>Export</button>
+                    )}
                 </div>
             </div>
             <div className="card-body">
