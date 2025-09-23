@@ -128,6 +128,11 @@ const OrderList = ({ user }) => {
         e.preventDefault();
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData.entries());
+
+        if (editingOrder.orderTypeName?.toLowerCase() === 'sail') {
+            data.isIHC = formData.has('isIHC');
+        }
+
         await updateDoc(doc(db, "orders", editingOrder.id), data);
         toast.success("Order updated successfully.");
         setEditingOrder(null);
@@ -249,6 +254,20 @@ const OrderList = ({ user }) => {
                                         <div className="col-md-6"><label className="form-label">Material</label><input name="material" defaultValue={editingOrder.material} className="form-control" /></div>
                                         <div className="col-md-6"><label className="form-label">Size</label><input name="size" defaultValue={editingOrder.size} className="form-control" /></div>
                                     </div>
+                                    {editingOrder.orderTypeName?.toLowerCase() === 'sail' && (
+                                        <div className="form-check mt-3">
+                                            <input
+                                                className="form-check-input"
+                                                type="checkbox"
+                                                name="isIHC"
+                                                id="isIHC"
+                                                defaultChecked={editingOrder.isIHC}
+                                            />
+                                            <label className="form-check-label" htmlFor="isIHC">
+                                                Is this an IHC Sail?
+                                            </label>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="modal-footer">
                                     <button type="button" className="btn btn-secondary" onClick={() => setEditingOrder(null)}>Close</button>
