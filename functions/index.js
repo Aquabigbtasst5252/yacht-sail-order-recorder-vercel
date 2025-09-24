@@ -10,6 +10,7 @@ const db = admin.firestore();
 // Define parameters that will be loaded from your .env file
 const gmailEmail = defineString("GMAIL_EMAIL");
 const gmailPassword = defineString("GMAIL_PASSWORD");
+const appUrl = defineString("APP_URL");
 
 const mailTransport = nodemailer.createTransport({
     service: "gmail",
@@ -55,22 +56,21 @@ exports.sendQcPhotoEmail = onDocumentCreated("orders/{orderId}/qcPhotos/{photoId
                 return;
             }
 
-            const settingsDoc = await db.collection("settings").doc("main").get();
-            const settingsData = settingsDoc.exists ? settingsDoc.data() : {};
+            const subject = `QC Photos for Order: ${orderData.aquaOrderNumber} (PO: ${orderData.customerPO || "N/A"})`;
 
-            let subject = settingsData.qcEmailSubject || "QC Photos for your Order: {aquaOrderNo}";
-            let body = settingsData.qcEmailBody || "Hello {customerName},\n\nThe QC photos for your order {aquaOrderNo} (PO: {customerPo}) are now available for viewing in the portal.";
+            const body = `Dear ${customerData.contactName || customerData.companyName},
 
-            subject = subject.replace(/{aquaOrderNo}/g, orderData.aquaOrderNumber || "N/A");
+The QC photos are ready to view for your reference.
 
-            body = body
-                .replace(/{customerName}/g, customerData.contactName || customerData.companyName || "Valued Customer")
-                .replace(/{aquaOrderNo}/g, orderData.aquaOrderNumber || "N/A")
-                .replace(/{customerPo}/g, orderData.customerPO || "N/A");
+You can view them by logging into the portal: ${appUrl.value()}
+
+Thanks & best regards,
+Yacht sail team.`;
 
             const mailOptions = {
                 from: `"Aqua Dynamics" <${gmailEmail.value()}>`,
                 to: recipientEmail,
+                cc: "chamal@aquadynamics.lk, bandu@aquadynamics.lk",
                 subject: subject,
                 text: body,
             };
