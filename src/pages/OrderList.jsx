@@ -128,48 +128,9 @@ const OrderList = ({ user }) => {
         e.preventDefault();
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData.entries());
-
-        if (editingOrder.orderTypeName?.toLowerCase() === 'sail') {
-            data.isIHC = formData.has('isIHC');
-        }
-
         await updateDoc(doc(db, "orders", editingOrder.id), data);
         toast.success("Order updated successfully.");
         setEditingOrder(null);
-    };
-
-    const handleExport = () => {
-        if (typeof window.XLSX === 'undefined') {
-            toast.error("Excel export library is not available.");
-            return;
-        }
-
-        const sailOrders = orders.filter(o => o.orderTypeName?.toLowerCase() === 'sail');
-        const accessoryOrders = orders.filter(o => o.orderTypeName?.toLowerCase() !== 'sail');
-
-        const formatOrders = (orderData) => orderData.map(o => ({
-            "Aqua Order No": o.aquaOrderNumber,
-            "Customer": o.customerCompanyName,
-            "Customer PO": o.customerPO,
-            "IFS Order No": o.ifsOrderNo,
-            "Product": o.productName,
-            "Material": o.material,
-            "Size": o.size,
-            "Quantity": o.quantity,
-            "Status": o.status,
-            "Is IHC": o.isIHC ? "Yes" : "No",
-            "Created Date": o.createdAt?.toDate().toLocaleDateString() || 'N/A',
-        }));
-
-        const sailSheet = window.XLSX.utils.json_to_sheet(formatOrders(sailOrders));
-        const accessorySheet = window.XLSX.utils.json_to_sheet(formatOrders(accessoryOrders));
-
-        const workbook = window.XLSX.utils.book_new();
-        window.XLSX.utils.book_append_sheet(workbook, sailSheet, "Sails");
-        window.XLSX.utils.book_append_sheet(workbook, accessorySheet, "Accessories");
-
-        window.XLSX.writeFile(workbook, "AllOrders.xlsx");
-        toast.success("Exporting orders to Excel.");
     };
     
     const indexOfLastEntry = currentPage * entriesPerPage;
@@ -194,7 +155,7 @@ const OrderList = ({ user }) => {
                         <button className={`nav-link ${activeTab === 'accessories' ? 'active' : ''}`} onClick={() => setActiveTab('accessories')}>Accessories</button>
                     </li>
                 </ul>
-                 <div className="d-flex gap-2">
+                 <div className="col-md-4">
                     <input
                         type="text"
                         className="form-control"
@@ -202,9 +163,6 @@ const OrderList = ({ user }) => {
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
-                    {!isCustomer && (
-                        <button className="btn btn-success" onClick={handleExport}>Export</button>
-                    )}
                 </div>
             </div>
             <div className="card-body">
@@ -291,20 +249,6 @@ const OrderList = ({ user }) => {
                                         <div className="col-md-6"><label className="form-label">Material</label><input name="material" defaultValue={editingOrder.material} className="form-control" /></div>
                                         <div className="col-md-6"><label className="form-label">Size</label><input name="size" defaultValue={editingOrder.size} className="form-control" /></div>
                                     </div>
-                                    {editingOrder.orderTypeName?.toLowerCase() === 'sail' && (
-                                        <div className="form-check mt-3">
-                                            <input
-                                                className="form-check-input"
-                                                type="checkbox"
-                                                name="isIHC"
-                                                id="isIHC"
-                                                defaultChecked={editingOrder.isIHC}
-                                            />
-                                            <label className="form-check-label" htmlFor="isIHC">
-                                                Is this an IHC Sail?
-                                            </label>
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="modal-footer">
                                     <button type="button" className="btn btn-secondary" onClick={() => setEditingOrder(null)}>Close</button>
