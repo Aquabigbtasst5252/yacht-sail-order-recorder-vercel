@@ -70,7 +70,7 @@ Yacht sail team.`;
             const mailOptions = {
                 from: `"Aqua Dynamics" <${gmailEmail.value()}>`,
                 to: recipientEmail,
-                cc: "chamal@aquadynamics.lk, bandu@aquadynamics.lk",
+                cc: "chamal@aquadynamics.lk, bandu@aquadynamics.lk, prasannaw@aquadynamics.lk, udana@aquadynamics.lk",
                 subject: subject,
                 text: body,
             };

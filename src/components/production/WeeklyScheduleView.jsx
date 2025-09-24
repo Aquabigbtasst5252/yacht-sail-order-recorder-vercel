@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { db } from '../../firebase';
 import { collection, query, where, onSnapshot, orderBy, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
-import { getCurrentWeekString } from '../../helpers';
 import OrderHistoryModal from '../modals/OrderHistoryModal';
 
 const WeeklyScheduleView = ({ user }) => {
@@ -46,17 +45,6 @@ const WeeklyScheduleView = ({ user }) => {
 
         return () => { unsubOrders(); unsubStatuses(); };
     }, [user, isCustomer]);
-
-    useEffect(() => {
-        if (deliveryWeeks.length > 0) {
-            const currentWeek = getCurrentWeekString();
-            if (deliveryWeeks.includes(currentWeek)) {
-                setSelectedWeek(currentWeek);
-            } else if (deliveryWeeks.length > 0) {
-                setSelectedWeek(deliveryWeeks[0]);
-            }
-        }
-    }, [deliveryWeeks]);
     
     const ordersByCustomer = useMemo(() => {
         if (!selectedWeek || !Array.isArray(allOrders)) return {};
@@ -188,28 +176,8 @@ const WeeklyScheduleView = ({ user }) => {
                             <div id="shipped-orders-collapse" className="accordion-collapse collapse">
                                 <div className="accordion-body p-0">
                                      <div className="table-responsive"><table className="table table-sm table-hover mb-0">
-                                        <thead><tr><th>Aqua Order #</th><th>Customer PO</th><th>Customer</th><th>Order Description</th><th>Qty</th><th>Delivery Date</th><th style={{width: '200px'}}>Status</th></tr></thead>
-                                        <tbody>{shippedOrders.map(order => (
-                                            <tr key={order.id} className="table-success">
-                                                <td>{order.aquaOrderNumber}</td>
-                                                <td>{order.customerPO}</td>
-                                                <td>{order.customerCompanyName}</td>
-                                                <td>{`${order.productName} - ${order.material} - ${order.size}`}</td>
-                                                <td>{order.quantity}</td>
-                                                <td>{order.deliveryDate}</td>
-                                                <td>
-                                                    <select
-                                                        className="form-select form-select-sm"
-                                                        value={order.statusId || ''}
-                                                        onChange={(e) => handleStatusChange(order, e.target.value)}
-                                                        disabled={isCustomer}
-                                                    >
-                                                        <option value="" disabled>{order.status || 'Change...'}</option>
-                                                        {getValidStatuses(order).map(s => <option key={s.id} value={s.id}>{s.description}</option>)}
-                                                    </select>
-                                                </td>
-                                            </tr>
-                                        ))}</tbody>
+                                        <thead><tr><th>Aqua Order #</th><th>Customer PO</th><th>Customer</th><th>Order Description</th><th>Qty</th><th>Delivery Date</th></tr></thead>
+                                        <tbody>{shippedOrders.map(order => <tr key={order.id} className="table-success"><td>{order.aquaOrderNumber}</td><td>{order.customerPO}</td><td>{order.customerCompanyName}</td><td>{`${order.productName} - ${order.material} - ${order.size}`}</td><td>{order.quantity}</td><td>{order.deliveryDate}</td></tr>)}</tbody>
                                     </table></div>
                                 </div>
                             </div>
