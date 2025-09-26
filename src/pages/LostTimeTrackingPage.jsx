@@ -8,7 +8,7 @@ import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const LostTimeTrackingPage = () => {
     // Form state
@@ -132,7 +132,7 @@ const LostTimeTrackingPage = () => {
                 tableRows.push(entryData);
             });
 
-            doc.autoTable({
+            autoTable(doc, {
                 head: [tableColumn],
                 body: tableRows,
                 startY: startY,
@@ -140,7 +140,7 @@ const LostTimeTrackingPage = () => {
                 headStyles: { fillColor: [22, 160, 133] },
             });
 
-            startY = doc.autoTable.previous.finalY + 10; // Update startY for next table
+            startY = doc.lastAutoTable.finalY + 10; // Update startY for next table
         });
 
 
