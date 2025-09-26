@@ -26,6 +26,7 @@ import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPanel from './pages/AdminPanel';
 import MachineBreakdownPage from './pages/MachineBreakdownPage';
+import LostTimeTrackingPage from './pages/LostTimeTrackingPage';
 
 // --- Main App Component ---
 export default function App() {
@@ -152,6 +153,7 @@ export default function App() {
                     case 'stock': return <CustomerStock user={userData} />;
                     case 'reports': return (isAdmin || isProduction) ? <ReportsPage /> : <Dashboard user={userData} />;
                     case 'machine-breakdown': return (isAdmin || isProduction) ? <MachineBreakdownPage user={userData} /> : <Dashboard user={userData} />;
+                    case 'lost-time-tracking': return (isAdmin || isProduction) ? <LostTimeTrackingPage user={userData} /> : <Dashboard user={userData} />;
                     case 'settings': return isAdmin ? <SettingsPage /> : <Dashboard user={userData} />;
                     case 'admin': return isAdmin ? <AdminPanel /> : <Dashboard user={userData} />;
                     case 'dashboard': default: return <Dashboard user={userData} />;
