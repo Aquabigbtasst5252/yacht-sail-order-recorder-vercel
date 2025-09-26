@@ -88,9 +88,9 @@ const LostTimeTrackingPage = () => {
         // Add black border
         doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
 
-        // Add Logo
-        const logo = '/logo.png'; // Assuming logo is in public folder
-        doc.addImage(logo, 'PNG', 10, 10, 38, 11); // Height of 1.1cm (11mm)
+        // Add Logo with specified dimensions
+        const logo = '/logo.png';
+        doc.addImage(logo, 'PNG', 10, 10, 13, 11); // width 1.3cm, height 1.1cm
 
         // Add Header Text
         doc.setFontSize(16);
@@ -98,51 +98,41 @@ const LostTimeTrackingPage = () => {
         doc.setFontSize(12);
         doc.text("Aqua Dynamics (Pvt) Ltd.", pageWidth / 2, 22, { align: 'center' });
 
-        // Group data by section
-        const groupedBySection = filteredEntries.reduce((acc, entry) => {
-            const section = entry.section || 'Uncategorized';
-            if (!acc[section]) {
-                acc[section] = [];
-            }
-            acc[section].push(entry);
-            return acc;
-        }, {});
+        // Define table columns as per new requirements
+        const tableColumn = [
+            "Ref. No", "Date", "Order number", "Qty", "employee number",
+            "Lost Time Reason", "Start time", "end time", "Signature if responsible person"
+        ];
+        const tableRows = [];
 
-        let startY = 35; // Initial Y position for the first table
-
-        Object.entries(groupedBySection).forEach(([section, entries]) => {
-            // Add section title
-            doc.setFontSize(14);
-            doc.text(section, 10, startY);
-            startY += 5;
-
-            const tableColumn = ["Date", "Employee", "Order #", "Qty", "Lost Time Reason", "Duration (mins)"];
-            const tableRows = [];
-
-            entries.forEach(entry => {
-                const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000;
-                const entryData = [
-                    format(entry.startDate.toDate(), 'yyyy-MM-dd'),
-                    entry.employeeName,
-                    entry.orderNumber,
-                    entry.orderQuantity,
-                    entry.lostTimeReason,
-                    duration.toFixed(2)
-                ];
-                tableRows.push(entryData);
-            });
-
-            autoTable(doc, {
-                head: [tableColumn],
-                body: tableRows,
-                startY: startY,
-                theme: 'striped',
-                headStyles: { fillColor: [22, 160, 133] },
-            });
-
-            startY = doc.lastAutoTable.finalY + 10; // Update startY for next table
+        // Prepare table rows from filtered entries
+        filteredEntries.forEach((entry, index) => {
+            const entryData = [
+                index + 1, // Ref. No
+                format(entry.startDate.toDate(), 'yyyy-MM-dd'),
+                entry.orderNumber,
+                entry.orderQuantity,
+                entry.epfNumber,
+                entry.lostTimeReason,
+                format(entry.startTime.toDate(), 'HH:mm'),
+                format(entry.endTime.toDate(), 'HH:mm'),
+                '' // Blank for signature
+            ];
+            tableRows.push(entryData);
         });
 
+        // Add the table to the PDF
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 35,
+            theme: 'striped',
+            headStyles: { fillColor: [22, 160, 133] },
+            styles: { fontSize: 8 },
+            columnStyles: {
+                8: { cellWidth: 40 }, // Widen the signature column
+            }
+        });
 
         doc.save(`lost-time-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
