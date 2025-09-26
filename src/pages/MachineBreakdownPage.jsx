@@ -58,8 +58,12 @@ const MachineBreakdownPage = ({ user }) => {
         const [startDate, endDate] = dateRange;
         if (startDate && endDate) {
             filtered = filtered.filter(b => {
-                const eventStartTime = b.startTime.toDate();
-                return eventStartTime >= startDate && eventStartTime <= endDate;
+                const eventDate = b.startTime || b.breakdownTime;
+                if (eventDate && typeof eventDate.toDate === 'function') {
+                    const eventStartTime = eventDate.toDate();
+                    return eventStartTime >= startDate && eventStartTime <= endDate;
+                }
+                return false;
             });
         }
 
@@ -190,12 +194,24 @@ const MachineBreakdownPage = ({ user }) => {
                             <tbody>
                                 {filteredBreakdowns.map((b) => (
                                     <tr key={b.id}>
-                                        <td>{b.machineName}</td>
-                                        <td>{b.reasonText}</td>
-                                        <td>{b.employeeName}</td>
-                                        <td>{new Date(b.startTime.seconds * 1000).toLocaleString()}</td>
-                                        <td>{new Date(b.endTime.seconds * 1000).toLocaleString()}</td>
-                                        <td>{formatDistanceStrict(new Date(b.endTime.seconds * 1000), new Date(b.startTime.seconds * 1000))}</td>
+                                        <td>{b.machineName || 'N/A'}</td>
+                                        <td>{b.reasonText || 'N/A'}</td>
+                                        <td>{b.employeeName || 'N/A'}</td>
+                                        <td>
+                                            {b.startTime && b.startTime.seconds
+                                                ? new Date(b.startTime.seconds * 1000).toLocaleString()
+                                                : (b.breakdownTime && b.breakdownTime.seconds ? new Date(b.breakdownTime.seconds * 1000).toLocaleString() : 'N/A')}
+                                        </td>
+                                        <td>
+                                            {b.endTime && b.endTime.seconds
+                                                ? new Date(b.endTime.seconds * 1000).toLocaleString()
+                                                : 'N/A'}
+                                        </td>
+                                        <td>
+                                            {b.startTime && b.startTime.seconds && b.endTime && b.endTime.seconds
+                                                ? formatDistanceStrict(new Date(b.endTime.seconds * 1000), new Date(b.startTime.seconds * 1000))
+                                                : 'N/A'}
+                                        </td>
                                         {isSuperAdmin && (
                                             <td>
                                                 <button className="btn btn-sm btn-danger" onClick={() => handleDelete(b.id)}>Delete</button>
