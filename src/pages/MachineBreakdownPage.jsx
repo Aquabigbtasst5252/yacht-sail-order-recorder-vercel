@@ -5,6 +5,7 @@ import { collection, addDoc, getDocs, serverTimestamp, onSnapshot, deleteDoc, do
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import toast from 'react-hot-toast';
+import { formatDistanceStrict } from 'date-fns';
 
 const MachineBreakdownPage = ({ user }) => {
     const [machines, setMachines] = useState([]);
@@ -16,7 +17,8 @@ const MachineBreakdownPage = ({ user }) => {
     const [selectedMachine, setSelectedMachine] = useState(null);
     const [selectedReason, setSelectedReason] = useState(null);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
-    const [breakdownDate, setBreakdownDate] = useState(new Date());
+    const [startDate, setStartDate] = useState(new Date());
+    const [endDate, setEndDate] = useState(new Date());
 
     const [searchQuery, setSearchQuery] = useState('');
     const [dateRange, setDateRange] = useState([null, null]);
@@ -56,8 +58,8 @@ const MachineBreakdownPage = ({ user }) => {
         const [startDate, endDate] = dateRange;
         if (startDate && endDate) {
             filtered = filtered.filter(b => {
-                const breakdownTime = b.breakdownTime.toDate();
-                return breakdownTime >= startDate && breakdownTime <= endDate;
+                const eventStartTime = b.startTime.toDate();
+                return eventStartTime >= startDate && eventStartTime <= endDate;
             });
         }
 
@@ -66,8 +68,12 @@ const MachineBreakdownPage = ({ user }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!selectedMachine || !selectedReason || !selectedEmployee || !breakdownDate) {
+        if (!selectedMachine || !selectedReason || !selectedEmployee || !startDate || !endDate) {
             return toast.error('Please fill out all fields.');
+        }
+
+        if (endDate < startDate) {
+            return toast.error('End date cannot be before start date.');
         }
 
         try {
@@ -78,7 +84,8 @@ const MachineBreakdownPage = ({ user }) => {
                 reasonText: selectedReason.label,
                 employeeId: selectedEmployee.value,
                 employeeName: selectedEmployee.label,
-                breakdownTime: breakdownDate,
+                startTime: startDate,
+                endTime: endDate,
                 createdAt: serverTimestamp(),
             });
 
@@ -86,7 +93,8 @@ const MachineBreakdownPage = ({ user }) => {
             setSelectedMachine(null);
             setSelectedReason(null);
             setSelectedEmployee(null);
-            setBreakdownDate(new Date());
+            setStartDate(new Date());
+            setEndDate(new Date());
         } catch (error) {
             toast.error('Failed to record breakdown.');
             console.error("Error adding document: ", error);
@@ -121,13 +129,17 @@ const MachineBreakdownPage = ({ user }) => {
                             </div>
                         </div>
                         <div className="row">
-                            <div className="col-md-6 mb-3">
+                        <div className="col-md-4 mb-3">
                                 <label className="form-label">Operator Name</label>
                                 <Select options={employees} value={selectedEmployee} onChange={setSelectedEmployee} isClearable />
                             </div>
-                            <div className="col-md-6 mb-3">
-                                <label className="form-label">Date & Time</label>
-                                <DatePicker selected={breakdownDate} onChange={(date) => setBreakdownDate(date)} showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="MMMM d, yyyy h:mm aa" className="form-control" />
+                        <div className="col-md-4 mb-3">
+                            <label className="form-label">Start Date & Time</label>
+                            <DatePicker selected={startDate} onChange={(date) => setStartDate(date)} showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="MMMM d, yyyy h:mm aa" className="form-control" />
+                        </div>
+                        <div className="col-md-4 mb-3">
+                            <label className="form-label">End Date & Time</label>
+                            <DatePicker selected={endDate} onChange={(date) => setEndDate(date)} showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="MMMM d, yyyy h:mm aa" className="form-control" />
                             </div>
                         </div>
                         <button type="submit" className="btn btn-primary">Save Breakdown</button>
@@ -169,7 +181,9 @@ const MachineBreakdownPage = ({ user }) => {
                                     <th>Machine</th>
                                     <th>Reason</th>
                                     <th>Operator</th>
-                                    <th>Date & Time</th>
+                                    <th>Start Time</th>
+                                    <th>End Time</th>
+                                    <th>Duration</th>
                                     {isSuperAdmin && <th>Actions</th>}
                                 </tr>
                             </thead>
@@ -179,7 +193,9 @@ const MachineBreakdownPage = ({ user }) => {
                                         <td>{b.machineName}</td>
                                         <td>{b.reasonText}</td>
                                         <td>{b.employeeName}</td>
-                                        <td>{new Date(b.breakdownTime.seconds * 1000).toLocaleString()}</td>
+                                        <td>{new Date(b.startTime.seconds * 1000).toLocaleString()}</td>
+                                        <td>{new Date(b.endTime.seconds * 1000).toLocaleString()}</td>
+                                        <td>{formatDistanceStrict(new Date(b.endTime.seconds * 1000), new Date(b.startTime.seconds * 1000))}</td>
                                         {isSuperAdmin && (
                                             <td>
                                                 <button className="btn btn-sm btn-danger" onClick={() => handleDelete(b.id)}>Delete</button>
