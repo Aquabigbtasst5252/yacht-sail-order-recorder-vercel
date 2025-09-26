@@ -1,8 +1,10 @@
 // src/pages/AdminPanel.jsx
 import React, { useState } from 'react';
 import UserManagementTab from '../components/admin/UserManagementTab';
-import CustomerManagementTab from '../components/admin/CustomerManagementTab'; // We will create this next
-import DataManagementTab from '../components/admin/DataManagementTab'; // We will create this next
+import CustomerManagementTab from '../components/admin/CustomerManagementTab';
+import DataManagementTab from '../components/admin/DataManagementTab';
+import MachineBreakdownTab from '../components/admin/MachineBreakdownTab';
+import LostTimeCodeManagement from '../components/admin/lost-time/LostTimeCodeManagement';
 
 const AdminPanel = () => {
     const [activeTab, setActiveTab] = useState('users');
@@ -15,6 +17,10 @@ const AdminPanel = () => {
                 return <CustomerManagementTab />;
             case 'data':
                 return <DataManagementTab />;
+            case 'machine-breakdown':
+                return <MachineBreakdownTab />;
+            case 'lost-time':
+                return <LostTimeCodeManagement />;
             default:
                 return <UserManagementTab />;
         }
@@ -27,6 +33,8 @@ const AdminPanel = () => {
                     <li className="nav-item"><button className={`nav-link ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>User Management</button></li>
                     <li className="nav-item"><button className={`nav-link ${activeTab === 'customers' ? 'active' : ''}`} onClick={() => setActiveTab('customers')}>Customer Profiles</button></li>
                     <li className="nav-item"><button className={`nav-link ${activeTab === 'data' ? 'active' : ''}`} onClick={() => setActiveTab('data')}>System Data</button></li>
+                    <li className="nav-item"><button className={`nav-link ${activeTab === 'machine-breakdown' ? 'active' : ''}`} onClick={() => setActiveTab('machine-breakdown')}>Machine Breakdown</button></li>
+                    <li className="nav-item"><button className={`nav-link ${activeTab === 'lost-time' ? 'active' : ''}`} onClick={() => setActiveTab('lost-time')}>Lost Time Codes</button></li>
                  </ul>
             </div>
             <div className="card-body">
