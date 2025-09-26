@@ -1,7 +1,7 @@
 // src/pages/LostTimeTrackingPage.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const LostTimeTrackingPage = () => {
+const LostTimeTrackingPage = ({ user }) => {
     // Form state
     const [startDate, setStartDate] = useState(new Date());
     const [startTime, setStartTime] = useState(new Date());
@@ -137,6 +137,19 @@ const LostTimeTrackingPage = () => {
         doc.save(`lost-time-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
 
+    const handleDelete = async (id) => {
+        if (window.confirm("Are you sure you want to delete this entry?")) {
+            try {
+                await deleteDoc(doc(db, "lostTimeEntries", id));
+                toast.success("Entry deleted successfully!");
+                fetchLostTimeEntries(); // Refresh the list
+            } catch (error) {
+                toast.error("Failed to delete entry. Please try again.");
+                console.error("Error deleting document: ", error);
+            }
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!selectedEmployee || !selectedLostTimeCode) {
@@ -259,6 +272,7 @@ const LostTimeTrackingPage = () => {
                                     <th>Lost Time Reason</th>
                                     <th>Order #</th>
                                     <th>Duration (mins)</th>
+                                    {user.role === 'super_admin' && <th>Actions</th>}
                                 </tr>
                             </thead>
                             <tbody>
@@ -272,6 +286,13 @@ const LostTimeTrackingPage = () => {
                                             <td>{entry.lostTimeReason}</td>
                                             <td>{entry.orderNumber}</td>
                                             <td>{duration.toFixed(2)}</td>
+                                            {user.role === 'super_admin' && (
+                                                <td>
+                                                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>
+                                                        Delete
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })}
