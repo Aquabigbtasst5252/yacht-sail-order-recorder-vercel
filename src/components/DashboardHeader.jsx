@@ -31,6 +31,9 @@ const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
                                 <li className="nav-item ms-3">
                                     <a className="nav-link" href="#" onClick={(e) => { e.preventDefault(); onNavigate('machine-breakdown'); }}>Machine Breakdown</a>
                                 </li>
+                                <li className="nav-item ms-3">
+                                    <a className="nav-link" href="#" onClick={(e) => { e.preventDefault(); onNavigate('lost-time-tracking'); }}>Daily Lost Time</a>
+                                </li>
                              </>
                         )}
                         {isCustomer && (
@@ -69,6 +72,7 @@ const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('planning'); }}>Production Schedule</a></li>}
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('reports'); }}>Reports</a></li>}
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('machine-breakdown'); }}>Machine Breakdown</a></li>}
+                            {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('lost-time-tracking'); }}>Daily Lost Time</a></li>}
                             
                             {isAdmin && <li><hr className="dropdown-divider" /></li>}
                             {isAdmin && <li><a className="dropdown-item fw-bold" href="#" onClick={(e) => { e.preventDefault(); onNavigate('admin'); }}>Admin Panel</a></li>}
