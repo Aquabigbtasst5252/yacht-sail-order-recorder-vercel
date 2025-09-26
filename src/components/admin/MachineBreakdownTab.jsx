@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import MachineManagement from './breakdown/MachineManagement';
 import BreakdownReasonManagement from './breakdown/BreakdownReasonManagement';
 import EmployeeManagement from './breakdown/EmployeeManagement';
+import LostTimeCodeManagement from './breakdown/LostTimeCodeManagement'; // Import the new component
 
 const MachineBreakdownTab = () => {
     const [activeTab, setActiveTab] = useState('machines');
@@ -15,6 +16,8 @@ const MachineBreakdownTab = () => {
                 return <BreakdownReasonManagement />;
             case 'employees':
                 return <EmployeeManagement />;
+            case 'lost-time-codes': // Add a case for the new tab
+                return <LostTimeCodeManagement />;
             default:
                 return <MachineManagement />;
         }
@@ -37,6 +40,11 @@ const MachineBreakdownTab = () => {
                     <li className="nav-item">
                         <button className={`nav-link ${activeTab === 'employees' ? 'active' : ''}`} onClick={() => setActiveTab('employees')}>
                             Employees
+                        </button>
+                    </li>
+                    <li className="nav-item">
+                        <button className={`nav-link ${activeTab === 'lost-time-codes' ? 'active' : ''}`} onClick={() => setActiveTab('lost-time-codes')}>
+                            Lost Time Codes
                         </button>
                     </li>
                 </ul>

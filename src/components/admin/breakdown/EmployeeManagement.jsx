@@ -8,6 +8,7 @@ const EmployeeManagement = () => {
     const [employees, setEmployees] = useState([]);
     const [employeeName, setEmployeeName] = useState('');
     const [employeeNumber, setEmployeeNumber] = useState('');
+    const [section, setSection] = useState('Sticking'); // Add state for section
     const [editingEmployee, setEditingEmployee] = useState(null);
 
     const employeesCollectionRef = collection(db, 'employees');
@@ -24,21 +25,24 @@ const EmployeeManagement = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!employeeName || !employeeNumber) {
-            return toast.error('Both employee name and number are required.');
+            return toast.error('All fields are required.');
         }
+
+        const employeeData = { name: employeeName, number: employeeNumber, section };
 
         if (editingEmployee) {
             const employeeDoc = doc(db, 'employees', editingEmployee.id);
-            await updateDoc(employeeDoc, { name: employeeName, number: employeeNumber });
+            await updateDoc(employeeDoc, employeeData);
             toast.success('Employee updated successfully!');
             setEditingEmployee(null);
         } else {
-            await addDoc(employeesCollectionRef, { name: employeeName, number: employeeNumber });
+            await addDoc(employeesCollectionRef, employeeData);
             toast.success('Employee added successfully!');
         }
 
         setEmployeeName('');
         setEmployeeNumber('');
+        setSection('Sticking');
         fetchEmployees();
     };
 
@@ -46,6 +50,7 @@ const EmployeeManagement = () => {
         setEditingEmployee(employee);
         setEmployeeName(employee.name);
         setEmployeeNumber(employee.number);
+        setSection(employee.section || 'Sticking'); // Set section for editing
     };
 
     const handleDelete = async (id) => {
@@ -59,6 +64,7 @@ const EmployeeManagement = () => {
         setEditingEmployee(null);
         setEmployeeName('');
         setEmployeeNumber('');
+        setSection('Sticking');
     };
 
     return (
@@ -86,6 +92,19 @@ const EmployeeManagement = () => {
                         required
                     />
                 </div>
+                <div className="mb-3">
+                    <label htmlFor="section" className="form-label">Section</label>
+                    <select
+                        className="form-control"
+                        id="section"
+                        value={section}
+                        onChange={(e) => setSection(e.target.value)}
+                    >
+                        <option value="Sticking">Sticking</option>
+                        <option value="Sewing">Sewing</option>
+                        <option value="End Control">End Control</option>
+                    </select>
+                </div>
                 <button type="submit" className="btn btn-primary me-2">
                     {editingEmployee ? 'Update' : 'Add'} Employee
                 </button>
@@ -101,6 +120,7 @@ const EmployeeManagement = () => {
                     <tr>
                         <th>Name</th>
                         <th>Number</th>
+                        <th>Section</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -109,6 +129,7 @@ const EmployeeManagement = () => {
                         <tr key={employee.id}>
                             <td>{employee.name}</td>
                             <td>{employee.number}</td>
+                            <td>{employee.section}</td>
                             <td>
                                 <button className="btn btn-sm btn-warning me-2" onClick={() => handleEdit(employee)}>
                                     Edit
