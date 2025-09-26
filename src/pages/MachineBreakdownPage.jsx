@@ -133,17 +133,19 @@ const MachineBreakdownPage = ({ user }) => {
                             </div>
                         </div>
                         <div className="row">
-                        <div className="col-md-4 mb-3">
+                            <div className="col-md-12 mb-3">
                                 <label className="form-label">Operator Name</label>
                                 <Select options={employees} value={selectedEmployee} onChange={setSelectedEmployee} isClearable />
                             </div>
-                        <div className="col-md-4 mb-3">
-                            <label className="form-label">Start Date & Time</label>
-                            <DatePicker selected={startDate} onChange={(date) => setStartDate(date)} showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="MMMM d, yyyy h:mm aa" className="form-control" />
                         </div>
-                        <div className="col-md-4 mb-3">
-                            <label className="form-label">End Date & Time</label>
-                            <DatePicker selected={endDate} onChange={(date) => setEndDate(date)} showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="MMMM d, yyyy h:mm aa" className="form-control" />
+                        <div className="row">
+                            <div className="col-md-6 mb-3">
+                                <label className="form-label">Start Date & Time</label>
+                                <DatePicker selected={startDate} onChange={(date) => setStartDate(date)} showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="MMMM d, yyyy h:mm aa" className="form-control" />
+                            </div>
+                            <div className="col-md-6 mb-3">
+                                <label className="form-label">End Date & Time</label>
+                                <DatePicker selected={endDate} onChange={(date) => setEndDate(date)} showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="MMMM d, yyyy h:mm aa" className="form-control" />
                             </div>
                         </div>
                         <button type="submit" className="btn btn-primary">Save Breakdown</button>
