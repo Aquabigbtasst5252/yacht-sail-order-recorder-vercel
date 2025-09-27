@@ -1,16 +1,20 @@
 // src/components/production/AllActiveOrdersView.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import DatePicker from "react-datepicker";
+import toast from 'react-hot-toast';
 import { db } from '../../firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
 import { getWeekStringFromDate } from '../../helpers';
-import OrderHistoryModal from '../modals/OrderHistoryModal'; // Note: We will create this file later
+import OrderHistoryModal from '../modals/OrderHistoryModal';
 
 const AllActiveOrdersView = ({ user }) => {
     const [activeOrders, setActiveOrders] = useState([]);
+    const [productionStatuses, setProductionStatuses] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
+    const [stoppingOrder, setStoppingOrder] = useState(null);
+    const [stopReason, setStopReason] = useState('');
     const isCustomer = user.role === 'customer';
 
     useEffect(() => {
@@ -28,7 +32,7 @@ const AllActiveOrdersView = ({ user }) => {
             q = query(collection(db, "orders"), where("status", "not-in", ["Shipped", "Cancelled"]));
         }
         
-        const unsub = onSnapshot(q, (snap) => {
+        const unsubOrders = onSnapshot(q, (snap) => {
             let activeOrdersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             
             if(isCustomer) {
@@ -38,7 +42,13 @@ const AllActiveOrdersView = ({ user }) => {
             setActiveOrders(activeOrdersData);
             setIsLoading(false);
         });
-        return () => unsub();
+
+        const statusesQuery = query(collection(db, "productionStatuses"), orderBy("order"));
+        const unsubStatuses = onSnapshot(statusesQuery, (snap) => {
+            setProductionStatuses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+
+        return () => { unsubOrders(); unsubStatuses(); };
     }, [user, isCustomer]);
 
     const toYYYYMMDD = (date) => {
@@ -57,6 +67,52 @@ const AllActiveOrdersView = ({ user }) => {
             deliveryDate: newDateString,
             deliveryWeek: newWeek
         });
+    };
+
+    const updateOrderStatus = async (order, newStatusId, reason = null) => {
+        const newStatus = productionStatuses.find(s => s.id === newStatusId);
+        if (!newStatus) return;
+
+        const historyRef = collection(db, "orders", order.id, "statusHistory");
+        const historyEntry = { status: newStatus.description, changedBy: user.name, timestamp: serverTimestamp(), ...(reason && { reason }) };
+        const orderRef = doc(db, "orders", order.id);
+        const orderUpdate = { status: newStatus.description, statusId: newStatusId };
+
+        const batch = writeBatch(db);
+        batch.update(orderRef, orderUpdate);
+        batch.set(doc(historyRef), historyEntry);
+        await batch.commit();
+        toast.success(`Order ${order.aquaOrderNumber} status updated.`);
+    };
+
+    const handleStatusChange = (order, newStatusId) => {
+        const newStatus = productionStatuses.find(s => s.id === newStatusId);
+        if (!newStatus) return;
+
+        if (newStatus.description.toLowerCase() === 'temporary stop') {
+            setStoppingOrder({ order, newStatusId });
+        } else {
+            updateOrderStatus(order, newStatusId);
+        }
+    };
+
+    const handleStopReasonSubmit = async (e) => {
+        e.preventDefault();
+        if (!stopReason) {
+            toast.error("Please provide a reason for stopping the order.");
+            return;
+        }
+        await updateOrderStatus(stoppingOrder.order, stoppingOrder.newStatusId, stopReason);
+        setStoppingOrder(null);
+        setStopReason('');
+    };
+
+    const getValidStatuses = (order) => {
+        return productionStatuses.filter(status =>
+            order.orderTypeId && order.productId &&
+            status.orderTypeIds?.includes(order.orderTypeId) &&
+            status.productTypeIds?.includes(order.productId)
+        );
     };
 
     const groupedAndFilteredOrders = useMemo(() => {
@@ -108,12 +164,13 @@ const AllActiveOrdersView = ({ user }) => {
                             <th>IFS Order #</th>
                             <th>Order Description</th>
                             <th>Qty</th>
-                            <th style={{width: '200px'}}>Delivery Date (sets week)</th>
+                            <th style={{width: '150px'}}>Delivery Date</th>
+                            <th style={{width: '200px'}}>Production Status</th>
                         </tr>
                     </thead>
                     {Object.keys(groupedAndFilteredOrders).sort().map(customerName => (
                         <tbody key={customerName}>
-                            <tr className="table-light"><th colSpan="6" className="ps-2">{customerName}</th></tr>
+                            <tr className="table-light"><th colSpan="7" className="ps-2">{customerName}</th></tr>
                             {groupedAndFilteredOrders[customerName].map(order => (
                                 <tr key={order.id}>
                                     <td>
@@ -139,12 +196,37 @@ const AllActiveOrdersView = ({ user }) => {
                                             disabled={isCustomer}
                                         />
                                     </td>
+                                    <td>
+                                        <select
+                                            className="form-select form-select-sm"
+                                            value={order.statusId || ''}
+                                            onChange={(e) => handleStatusChange(order, e.target.value)}
+                                            disabled={isCustomer || order.status?.toLowerCase() === 'shipped'}
+                                        >
+                                            <option value="" disabled>{order.status || 'Change...'}</option>
+                                            {getValidStatuses(order).map(s => <option key={s.id} value={s.id}>{s.description}</option>)}
+                                        </select>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     ))}
                 </table>
             </div>
+
+            {stoppingOrder && (
+                <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }} tabIndex="-1">
+                    <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content"><div className="modal-header"><h5 className="modal-title">Temporary Stop Reason</h5><button type="button" className="btn-close" onClick={() => setStoppingOrder(null)}></button></div>
+                            <form onSubmit={handleStopReasonSubmit}><div className="modal-body">
+                                <p>Please provide a reason for stopping order: <strong>{stoppingOrder.order.aquaOrderNumber}</strong></p>
+                                <textarea className="form-control" rows="3" value={stopReason} onChange={(e) => setStopReason(e.target.value)} required />
+                            </div><div className="modal-footer"><button type="button" className="btn btn-secondary" onClick={() => setStoppingOrder(null)}>Cancel</button><button type="submit" className="btn btn-primary">Save Reason</button></div></form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {viewingHistoryFor && (
                 <OrderHistoryModal 
                     order={viewingHistoryFor}
