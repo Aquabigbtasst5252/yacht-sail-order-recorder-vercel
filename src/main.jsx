@@ -4,7 +4,33 @@ import ReactDOM from 'react-dom/client';
 import 'bootstrap/dist/css/bootstrap.min.css';
 // 2. Import Bootstrap's JavaScript bundle.
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+
+// 3. Import and register Chart.js components
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
 import App from './App.jsx';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend
+);
 import './index.css'; // Your custom global styles (now clean)
 
 ReactDOM.createRoot(document.getElementById('root')).render(
