@@ -1,7 +1,7 @@
 // src/pages/ComprehensiveReport.jsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, query, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from 'date-fns';
@@ -21,10 +21,9 @@ import MachineBreakdownReport from '../components/reports/MachineBreakdownReport
 import LostTimeReport from '../components/reports/LostTimeReport';
 
 const ComprehensiveReport = () => {
-    const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)));
+    const [startDate, setStartDate] = useState(new Date(new Date().setMonth(new Date().getMonth() - 1)));
     const [endDate, setEndDate] = useState(new Date());
 
-    // Data states
     const [allOrders, setAllOrders] = useState([]);
     const [machineBreakdowns, setMachineBreakdowns] = useState([]);
     const [lostTimeEntries, setLostTimeEntries] = useState([]);
@@ -37,46 +36,32 @@ const ComprehensiveReport = () => {
     useEffect(() => {
         setLoading(true);
 
-        const unsubOrders = onSnapshot(query(collection(db, "orders")), (snap) => {
-            const data = snap.docs.map(d => {
-                const docData = d.data();
-                return {
-                    id: d.id, ...docData,
-                    orderDate: docData.orderDate?.toDate ? docData.orderDate.toDate() : null
-                };
-            });
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        if (!startDate || !endDate) return;
+
+        const ordersQuery = query(collection(db, "orders"), where("orderDate", ">=", start), where("orderDate", "<=", end));
+        const unsubOrders = onSnapshot(ordersQuery, (snap) => {
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), orderDate: d.data().orderDate?.toDate() }));
             setAllOrders(data);
         }, (err) => console.error("Error fetching orders:", err));
 
-        const unsubBreakdowns = onSnapshot(query(collection(db, "machineBreakdowns")), (snap) => {
-            const data = snap.docs.map(d => {
-                const docData = d.data();
-                const filterTimestamp = docData.startTime || docData.breakdownTime;
-                return {
-                    id: d.id, ...docData,
-                    startTime: docData.startTime?.toDate ? docData.startTime.toDate() : null,
-                    endTime: docData.endTime?.toDate ? docData.endTime.toDate() : null,
-                    filterDate: filterTimestamp?.toDate ? filterTimestamp.toDate() : null
-                };
-            });
+        const breakdownsQuery = query(collection(db, "machineBreakdowns"), where("startTime", ">=", start), where("startTime", "<=", end));
+        const unsubBreakdowns = onSnapshot(breakdownsQuery, (snap) => {
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() }));
             setMachineBreakdowns(data);
         }, (err) => console.error("Error fetching machine breakdowns:", err));
 
-        const unsubLostTime = onSnapshot(query(collection(db, "lostTimeEntries")), (snap) => {
-            const data = snap.docs.map(d => {
-                const docData = d.data();
-                return {
-                    id: d.id, ...docData,
-                    startDate: docData.startDate?.toDate ? docData.startDate.toDate() : null,
-                    startTime: docData.startTime?.toDate ? docData.startTime.toDate() : null,
-                    endTime: docData.endTime?.toDate ? docData.endTime.toDate() : null,
-                    filterDate: docData.startDate?.toDate ? docData.startDate.toDate() : null
-                };
-            });
+        const lostTimeQuery = query(collection(db, "lostTimeEntries"), where("startDate", ">=", start), where("startDate", "<=", end));
+        const unsubLostTime = onSnapshot(lostTimeQuery, (snap) => {
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), startDate: d.data().startDate?.toDate(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() }));
             setLostTimeEntries(data);
         }, (err) => console.error("Error fetching lost time entries:", err));
 
-        const timer = setTimeout(() => setLoading(false), 3000); // Increased timeout for all data to load
+        const timer = setTimeout(() => setLoading(false), 1500); // Give time for queries to run
 
         return () => {
             unsubOrders();
@@ -84,26 +69,7 @@ const ComprehensiveReport = () => {
             unsubLostTime();
             clearTimeout(timer);
         };
-    }, []);
-
-    const dateRangeFilter = (items, dateField) => {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-
-        return items.filter(item => {
-            const itemDate = item[dateField];
-            if (itemDate && typeof itemDate.getTime === 'function' && !isNaN(itemDate.getTime())) {
-                return itemDate >= start && itemDate <= end;
-            }
-            return false;
-        });
-    };
-
-    const filteredOrders = useMemo(() => dateRangeFilter(allOrders, 'orderDate'), [startDate, endDate, allOrders]);
-    const filteredBreakdowns = useMemo(() => dateRangeFilter(machineBreakdowns, 'filterDate'), [startDate, endDate, machineBreakdowns]);
-    const filteredLostTime = useMemo(() => dateRangeFilter(lostTimeEntries, 'filterDate'), [startDate, endDate, lostTimeEntries]);
+    }, [startDate, endDate]);
 
     const handleExportPDF = () => {
         setIsExporting(true);
@@ -174,16 +140,16 @@ const ComprehensiveReport = () => {
     };
 
     const reportComponents = [
-        { key: 'salesByCustomerSails', Component: SalesByCustomerSails, props: { orders: filteredOrders } },
-        { key: 'salesByCustomerAccessories', Component: SalesByCustomerAccessories, props: { orders: filteredOrders } },
-        { key: 'monthlyOrdersSails', Component: MonthlyOrdersSails, props: { orders: filteredOrders } },
-        { key: 'monthlyOrdersAccessories', Component: MonthlyOrdersAccessories, props: { orders: filteredOrders } },
-        { key: 'monthlyMaterialUsageSails', Component: MonthlyMaterialUsageSails, props: { orders: filteredOrders } },
-        { key: 'monthlyMaterialUsageAccessories', Component: MonthlyMaterialUsageAccessories, props: { orders: filteredOrders } },
-        { key: 'productTypeAnalysisSails', Component: ProductTypeAnalysisSails, props: { orders: filteredOrders } },
-        { key: 'productTypeAnalysisAccessories', Component: ProductTypeAnalysisAccessories, props: { orders: filteredOrders } },
-        { key: 'machineBreakdown', Component: MachineBreakdownReport, props: { breakdowns: filteredBreakdowns } },
-        { key: 'lostTime', Component: LostTimeReport, props: { lostTimeEntries: filteredLostTime } },
+        { key: 'salesByCustomerSails', Component: SalesByCustomerSails, props: { orders: allOrders } },
+        { key: 'salesByCustomerAccessories', Component: SalesByCustomerAccessories, props: { orders: allOrders } },
+        { key: 'monthlyOrdersSails', Component: MonthlyOrdersSails, props: { orders: allOrders } },
+        { key: 'monthlyOrdersAccessories', Component: MonthlyOrdersAccessories, props: { orders: allOrders } },
+        { key: 'monthlyMaterialUsageSails', Component: MonthlyMaterialUsageSails, props: { orders: allOrders } },
+        { key: 'monthlyMaterialUsageAccessories', Component: MonthlyMaterialUsageAccessories, props: { orders: allOrders } },
+        { key: 'productTypeAnalysisSails', Component: ProductTypeAnalysisSails, props: { orders: allOrders } },
+        { key: 'productTypeAnalysisAccessories', Component: ProductTypeAnalysisAccessories, props: { orders: allOrders } },
+        { key: 'machineBreakdown', Component: MachineBreakdownReport, props: { breakdowns: machineBreakdowns } },
+        { key: 'lostTime', Component: LostTimeReport, props: { lostTimeEntries: lostTimeEntries } },
     ];
 
     return (
