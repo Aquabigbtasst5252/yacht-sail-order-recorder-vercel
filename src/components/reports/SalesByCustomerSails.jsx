@@ -46,7 +46,7 @@ const SalesByCustomerSails = forwardRef(({ orders }, ref) => {
     };
 
     return (
-        <div className="col-md-6 mb-4">
+        <div className="col-12">
             <div className="card h-100">
                 <div className="card-header">
                     <h5 className="card-title mb-0">{processedData.title}</h5>
