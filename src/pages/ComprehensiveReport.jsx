@@ -17,11 +17,18 @@ import MonthlyMaterialUsageSails from '../components/reports/MonthlyMaterialUsag
 import MonthlyMaterialUsageAccessories from '../components/reports/MonthlyMaterialUsageAccessories';
 import ProductTypeAnalysisSails from '../components/reports/ProductTypeAnalysisSails';
 import ProductTypeAnalysisAccessories from '../components/reports/ProductTypeAnalysisAccessories';
+import MachineBreakdownReport from '../components/reports/MachineBreakdownReport';
+import LostTimeReport from '../components/reports/LostTimeReport';
 
 const ComprehensiveReport = () => {
     const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)));
     const [endDate, setEndDate] = useState(new Date());
+
+    // Data states
     const [allOrders, setAllOrders] = useState([]);
+    const [machineBreakdowns, setMachineBreakdowns] = useState([]);
+    const [lostTimeEntries, setLostTimeEntries] = useState([]);
+
     const [loading, setLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
 
@@ -29,39 +36,59 @@ const ComprehensiveReport = () => {
     const reportRefs = useRef({});
 
     useEffect(() => {
-        const ordersQuery = query(collection(db, "orders"));
-        const unsubscribe = onSnapshot(ordersQuery, (snap) => {
-            const ordersData = snap.docs.map(d => ({
-                id: d.id,
-                ...d.data(),
-                orderDate: d.data().orderDate?.toDate ? d.data().orderDate.toDate() : new Date(d.data().orderDate)
+        setLoading(true);
+        const unsubOrders = onSnapshot(query(collection(db, "orders")), (snap) => {
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), orderDate: d.data().orderDate?.toDate ? d.data().orderDate.toDate() : new Date(d.data().orderDate) }));
+            setAllOrders(data);
+        }, (err) => console.error("Error fetching orders:", err));
+
+        const unsubBreakdowns = onSnapshot(query(collection(db, "machineBreakdowns")), (snap) => {
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), startTime: d.data().startTime?.toDate ? d.data().startTime.toDate() : new Date(d.data().startTime), endTime: d.data().endTime?.toDate ? d.data().endTime.toDate() : new Date(d.data().endTime) }));
+            setMachineBreakdowns(data);
+        }, (err) => console.error("Error fetching machine breakdowns:", err));
+
+        const unsubLostTime = onSnapshot(query(collection(db, "lostTimeEntries")), (snap) => {
+            const data = snap.docs.map(d => ({
+                id: d.id, ...d.data(),
+                startDate: d.data().startDate?.toDate ? d.data().startDate.toDate() : new Date(d.data().startDate),
+                startTime: d.data().startTime?.toDate ? d.data().startTime.toDate() : new Date(d.data().startTime),
+                endTime: d.data().endTime?.toDate ? d.data().endTime.toDate() : new Date(d.data().endTime)
             }));
-            setAllOrders(ordersData);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching orders:", error);
-            setLoading(false);
-        });
-        return () => unsubscribe();
+            setLostTimeEntries(data);
+        }, (err) => console.error("Error fetching lost time entries:", err));
+
+        // A simple way to handle loading state for multiple async calls
+        const timer = setTimeout(() => setLoading(false), 2500);
+
+        return () => {
+            unsubOrders();
+            unsubBreakdowns();
+            unsubLostTime();
+            clearTimeout(timer);
+        };
     }, []);
 
-    const filteredOrders = useMemo(() => {
+    const dateRangeFilter = (items, dateField) => {
         const start = new Date(startDate);
         start.setHours(0, 0, 0, 0);
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        return allOrders.filter(order => {
-            if (order.orderDate && typeof order.orderDate.getTime === 'function') {
-                return order.orderDate >= start && order.orderDate <= end;
+        return items.filter(item => {
+            const itemDate = item[dateField];
+            if (itemDate && typeof itemDate.getTime === 'function') {
+                return itemDate >= start && itemDate <= end;
             }
             return false;
         });
-    }, [startDate, endDate, allOrders]);
+    };
+
+    const filteredOrders = useMemo(() => dateRangeFilter(allOrders, 'orderDate'), [startDate, endDate, allOrders]);
+    const filteredBreakdowns = useMemo(() => dateRangeFilter(machineBreakdowns, 'startTime'), [startDate, endDate, machineBreakdowns]);
+    const filteredLostTime = useMemo(() => dateRangeFilter(lostTimeEntries, 'startDate'), [startDate, endDate, lostTimeEntries]);
 
     const handleExportPDF = () => {
         setIsExporting(true);
 
-        // Use a timeout to allow the UI to update before the heavy PDF generation task
         setTimeout(() => {
             const doc = new jsPDF('p', 'mm', 'a4');
             const pageWidth = doc.internal.pageSize.getWidth();
@@ -78,7 +105,6 @@ const ComprehensiveReport = () => {
             doc.text("Yacht Sails Department", pageWidth / 2, yPos + 12, { align: 'center' });
             yPos += 20;
 
-            // Date Range
             doc.setFontSize(10);
             const dateRangeStr = `Date Range: ${format(startDate, 'yyyy-MM-dd')} to ${format(endDate, 'yyyy-MM-dd')}`;
             doc.text(dateRangeStr, margin, yPos);
@@ -87,7 +113,7 @@ const ComprehensiveReport = () => {
             const reportOrder = [
                 'salesByCustomerSails', 'salesByCustomerAccessories', 'monthlyOrdersSails',
                 'monthlyOrdersAccessories', 'monthlyMaterialUsageSails', 'monthlyMaterialUsageAccessories',
-                'productTypeAnalysisSails', 'productTypeAnalysisAccessories'
+                'productTypeAnalysisSails', 'productTypeAnalysisAccessories', 'machineBreakdown', 'lostTime'
             ];
 
             reportOrder.forEach(key => {
@@ -130,14 +156,16 @@ const ComprehensiveReport = () => {
     };
 
     const reportComponents = [
-        { key: 'salesByCustomerSails', Component: SalesByCustomerSails },
-        { key: 'salesByCustomerAccessories', Component: SalesByCustomerAccessories },
-        { key: 'monthlyOrdersSails', Component: MonthlyOrdersSails },
-        { key: 'monthlyOrdersAccessories', Component: MonthlyOrdersAccessories },
-        { key: 'monthlyMaterialUsageSails', Component: MonthlyMaterialUsageSails },
-        { key: 'monthlyMaterialUsageAccessories', Component: MonthlyMaterialUsageAccessories },
-        { key: 'productTypeAnalysisSails', Component: ProductTypeAnalysisSails },
-        { key: 'productTypeAnalysisAccessories', Component: ProductTypeAnalysisAccessories },
+        { key: 'salesByCustomerSails', Component: SalesByCustomerSails, props: { orders: filteredOrders } },
+        { key: 'salesByCustomerAccessories', Component: SalesByCustomerAccessories, props: { orders: filteredOrders } },
+        { key: 'monthlyOrdersSails', Component: MonthlyOrdersSails, props: { orders: filteredOrders } },
+        { key: 'monthlyOrdersAccessories', Component: MonthlyOrdersAccessories, props: { orders: filteredOrders } },
+        { key: 'monthlyMaterialUsageSails', Component: MonthlyMaterialUsageSails, props: { orders: filteredOrders } },
+        { key: 'monthlyMaterialUsageAccessories', Component: MonthlyMaterialUsageAccessories, props: { orders: filteredOrders } },
+        { key: 'productTypeAnalysisSails', Component: ProductTypeAnalysisSails, props: { orders: filteredOrders } },
+        { key: 'productTypeAnalysisAccessories', Component: ProductTypeAnalysisAccessories, props: { orders: filteredOrders } },
+        { key: 'machineBreakdown', Component: MachineBreakdownReport, props: { breakdowns: filteredBreakdowns } },
+        { key: 'lostTime', Component: LostTimeReport, props: { lostTimeEntries: filteredLostTime } },
     ];
 
     return (
@@ -167,10 +195,10 @@ const ComprehensiveReport = () => {
                         </div>
                     ) : (
                         <div className="row">
-                            {reportComponents.map(({ key, Component }) => (
+                            {reportComponents.map(({ key, Component, props }) => (
                                 <Component
                                     key={key}
-                                    orders={filteredOrders}
+                                    {...props}
                                     ref={el => (reportRefs.current[key] = el)}
                                 />
                             ))}
