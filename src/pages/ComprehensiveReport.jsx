@@ -32,33 +32,51 @@ const ComprehensiveReport = () => {
     const [loading, setLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
 
-    // This ref will hold the imperative handles of the report components
     const reportRefs = useRef({});
 
     useEffect(() => {
         setLoading(true);
+
         const unsubOrders = onSnapshot(query(collection(db, "orders")), (snap) => {
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), orderDate: d.data().orderDate?.toDate ? d.data().orderDate.toDate() : new Date(d.data().orderDate) }));
+            const data = snap.docs.map(d => {
+                const docData = d.data();
+                return {
+                    id: d.id, ...docData,
+                    orderDate: docData.orderDate?.toDate ? docData.orderDate.toDate() : null
+                };
+            });
             setAllOrders(data);
         }, (err) => console.error("Error fetching orders:", err));
 
         const unsubBreakdowns = onSnapshot(query(collection(db, "machineBreakdowns")), (snap) => {
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), startTime: d.data().startTime?.toDate ? d.data().startTime.toDate() : new Date(d.data().startTime), endTime: d.data().endTime?.toDate ? d.data().endTime.toDate() : new Date(d.data().endTime) }));
+            const data = snap.docs.map(d => {
+                const docData = d.data();
+                const filterTimestamp = docData.startTime || docData.breakdownTime;
+                return {
+                    id: d.id, ...docData,
+                    startTime: docData.startTime?.toDate ? docData.startTime.toDate() : null,
+                    endTime: docData.endTime?.toDate ? docData.endTime.toDate() : null,
+                    filterDate: filterTimestamp?.toDate ? filterTimestamp.toDate() : null
+                };
+            });
             setMachineBreakdowns(data);
         }, (err) => console.error("Error fetching machine breakdowns:", err));
 
         const unsubLostTime = onSnapshot(query(collection(db, "lostTimeEntries")), (snap) => {
-            const data = snap.docs.map(d => ({
-                id: d.id, ...d.data(),
-                startDate: d.data().startDate?.toDate ? d.data().startDate.toDate() : new Date(d.data().startDate),
-                startTime: d.data().startTime?.toDate ? d.data().startTime.toDate() : new Date(d.data().startTime),
-                endTime: d.data().endTime?.toDate ? d.data().endTime.toDate() : new Date(d.data().endTime)
-            }));
+            const data = snap.docs.map(d => {
+                const docData = d.data();
+                return {
+                    id: d.id, ...docData,
+                    startDate: docData.startDate?.toDate ? docData.startDate.toDate() : null,
+                    startTime: docData.startTime?.toDate ? docData.startTime.toDate() : null,
+                    endTime: docData.endTime?.toDate ? docData.endTime.toDate() : null,
+                    filterDate: docData.startDate?.toDate ? docData.startDate.toDate() : null
+                };
+            });
             setLostTimeEntries(data);
         }, (err) => console.error("Error fetching lost time entries:", err));
 
-        // A simple way to handle loading state for multiple async calls
-        const timer = setTimeout(() => setLoading(false), 2500);
+        const timer = setTimeout(() => setLoading(false), 3000); // Increased timeout for all data to load
 
         return () => {
             unsubOrders();
@@ -73,9 +91,10 @@ const ComprehensiveReport = () => {
         start.setHours(0, 0, 0, 0);
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
+
         return items.filter(item => {
             const itemDate = item[dateField];
-            if (itemDate && typeof itemDate.getTime === 'function') {
+            if (itemDate && typeof itemDate.getTime === 'function' && !isNaN(itemDate.getTime())) {
                 return itemDate >= start && itemDate <= end;
             }
             return false;
@@ -83,8 +102,8 @@ const ComprehensiveReport = () => {
     };
 
     const filteredOrders = useMemo(() => dateRangeFilter(allOrders, 'orderDate'), [startDate, endDate, allOrders]);
-    const filteredBreakdowns = useMemo(() => dateRangeFilter(machineBreakdowns, 'startTime'), [startDate, endDate, machineBreakdowns]);
-    const filteredLostTime = useMemo(() => dateRangeFilter(lostTimeEntries, 'startDate'), [startDate, endDate, lostTimeEntries]);
+    const filteredBreakdowns = useMemo(() => dateRangeFilter(machineBreakdowns, 'filterDate'), [startDate, endDate, machineBreakdowns]);
+    const filteredLostTime = useMemo(() => dateRangeFilter(lostTimeEntries, 'filterDate'), [startDate, endDate, lostTimeEntries]);
 
     const handleExportPDF = () => {
         setIsExporting(true);
@@ -96,7 +115,6 @@ const ComprehensiveReport = () => {
             const margin = 10;
             let yPos = margin;
 
-            // Header
             const logo = '/logo.png';
             doc.addImage(logo, 'PNG', margin, yPos, 13, 11);
             doc.setFontSize(18);
