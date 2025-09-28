@@ -1,5 +1,5 @@
 // src/pages/ComprehensiveReport.jsx
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import DatePicker from 'react-datepicker';
@@ -30,6 +30,7 @@ const ComprehensiveReport = () => {
 
     const [loading, setLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
+    const [activeTab, setActiveTab] = useState('salesByCustomerSails');
 
     const reportRefs = useRef({});
 
@@ -45,23 +46,20 @@ const ComprehensiveReport = () => {
 
         const ordersQuery = query(collection(db, "orders"), where("orderDate", ">=", start), where("orderDate", "<=", end));
         const unsubOrders = onSnapshot(ordersQuery, (snap) => {
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), orderDate: d.data().orderDate?.toDate() }));
-            setAllOrders(data);
+            setAllOrders(snap.docs.map(d => ({ id: d.id, ...d.data(), orderDate: d.data().orderDate?.toDate() })));
         }, (err) => console.error("Error fetching orders:", err));
 
         const breakdownsQuery = query(collection(db, "machineBreakdowns"), where("startTime", ">=", start), where("startTime", "<=", end));
         const unsubBreakdowns = onSnapshot(breakdownsQuery, (snap) => {
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() }));
-            setMachineBreakdowns(data);
+            setMachineBreakdowns(snap.docs.map(d => ({ id: d.id, ...d.data(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() })));
         }, (err) => console.error("Error fetching machine breakdowns:", err));
 
         const lostTimeQuery = query(collection(db, "lostTimeEntries"), where("startDate", ">=", start), where("startDate", "<=", end));
         const unsubLostTime = onSnapshot(lostTimeQuery, (snap) => {
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), startDate: d.data().startDate?.toDate(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() }));
-            setLostTimeEntries(data);
+            setLostTimeEntries(snap.docs.map(d => ({ id: d.id, ...d.data(), startDate: d.data().startDate?.toDate(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() })));
         }, (err) => console.error("Error fetching lost time entries:", err));
 
-        const timer = setTimeout(() => setLoading(false), 1500); // Give time for queries to run
+        const timer = setTimeout(() => setLoading(false), 1500);
 
         return () => {
             unsubOrders();
@@ -94,19 +92,13 @@ const ComprehensiveReport = () => {
             doc.text(dateRangeStr, margin, yPos);
             yPos += 10;
 
-            const reportOrder = [
-                'salesByCustomerSails', 'salesByCustomerAccessories', 'monthlyOrdersSails',
-                'monthlyOrdersAccessories', 'monthlyMaterialUsageSails', 'monthlyMaterialUsageAccessories',
-                'productTypeAnalysisSails', 'productTypeAnalysisAccessories', 'machineBreakdown', 'lostTime'
-            ];
-
-            reportOrder.forEach(key => {
+            reportComponents.forEach(({ key }) => {
                 const report = reportRefs.current[key];
                 if (!report || !report.chart || !report.tableData || report.tableData.length === 0) return;
 
                 const { title, tableData, headers, chart } = report;
                 const chartImage = chart.toBase64Image();
-                const chartHeight = 70;
+                const chartHeight = 80; // Adjusted for a larger chart area
                 const tableHeight = (tableData.length + 1) * 5 + 10;
                 const sectionHeight = chartHeight + tableHeight + 20;
 
@@ -120,7 +112,7 @@ const ComprehensiveReport = () => {
                 yPos += 8;
 
                 doc.addImage(chartImage, 'PNG', margin, yPos, pageWidth - (margin * 2), chartHeight);
-                yPos += chartHeight + 5;
+                yPos += chartHeight + 10;
 
                 doc.autoTable({
                     head: [headers],
@@ -140,21 +132,21 @@ const ComprehensiveReport = () => {
     };
 
     const reportComponents = [
-        { key: 'salesByCustomerSails', Component: SalesByCustomerSails, props: { orders: allOrders } },
-        { key: 'salesByCustomerAccessories', Component: SalesByCustomerAccessories, props: { orders: allOrders } },
-        { key: 'monthlyOrdersSails', Component: MonthlyOrdersSails, props: { orders: allOrders } },
-        { key: 'monthlyOrdersAccessories', Component: MonthlyOrdersAccessories, props: { orders: allOrders } },
-        { key: 'monthlyMaterialUsageSails', Component: MonthlyMaterialUsageSails, props: { orders: allOrders } },
-        { key: 'monthlyMaterialUsageAccessories', Component: MonthlyMaterialUsageAccessories, props: { orders: allOrders } },
-        { key: 'productTypeAnalysisSails', Component: ProductTypeAnalysisSails, props: { orders: allOrders } },
-        { key: 'productTypeAnalysisAccessories', Component: ProductTypeAnalysisAccessories, props: { orders: allOrders } },
-        { key: 'machineBreakdown', Component: MachineBreakdownReport, props: { breakdowns: machineBreakdowns } },
-        { key: 'lostTime', Component: LostTimeReport, props: { lostTimeEntries: lostTimeEntries } },
+        { key: 'salesByCustomerSails', label: 'Sales by Customer (Sails)', Component: SalesByCustomerSails, props: { orders: allOrders } },
+        { key: 'salesByCustomerAccessories', label: 'Sales by Customer (Acc.)', Component: SalesByCustomerAccessories, props: { orders: allOrders } },
+        { key: 'monthlyOrdersSails', label: 'Monthly Orders (Sails)', Component: MonthlyOrdersSails, props: { orders: allOrders } },
+        { key: 'monthlyOrdersAccessories', label: 'Monthly Orders (Acc.)', Component: MonthlyOrdersAccessories, props: { orders: allOrders } },
+        { key: 'monthlyMaterialUsageSails', label: 'Material Usage (Sails)', Component: MonthlyMaterialUsageSails, props: { orders: allOrders } },
+        { key: 'monthlyMaterialUsageAccessories', label: 'Material Usage (Acc.)', Component: MonthlyMaterialUsageAccessories, props: { orders: allOrders } },
+        { key: 'productTypeAnalysisSails', label: 'Product Analysis (Sails)', Component: ProductTypeAnalysisSails, props: { orders: allOrders } },
+        { key: 'productTypeAnalysisAccessories', label: 'Product Analysis (Acc.)', Component: ProductTypeAnalysisAccessories, props: { orders: allOrders } },
+        { key: 'machineBreakdown', label: 'Machine Breakdowns', Component: MachineBreakdownReport, props: { breakdowns: machineBreakdowns } },
+        { key: 'lostTime', label: 'Lost Time', Component: LostTimeReport, props: { lostTimeEntries: lostTimeEntries } },
     ];
 
     return (
         <div className="container-fluid">
-            <div className="card" id="comprehensive-report-content">
+            <div className="card">
                 <div className="card-header d-flex justify-content-between align-items-center">
                     <h2 className="h4 mb-0">Comprehensive Report</h2>
                     <button className="btn btn-sm btn-success" onClick={handleExportPDF} disabled={loading || isExporting}>
@@ -174,19 +166,28 @@ const ComprehensiveReport = () => {
                     </div>
 
                     {loading ? (
-                        <div className="text-center py-5">
-                            <div className="spinner-border" role="status"><span className="visually-hidden">Loading...</span></div>
-                        </div>
+                        <div className="text-center py-5"><div className="spinner-border" role="status"><span className="visually-hidden">Loading...</span></div></div>
                     ) : (
-                        <div className="row">
-                            {reportComponents.map(({ key, Component, props }) => (
-                                <Component
-                                    key={key}
-                                    {...props}
-                                    ref={el => (reportRefs.current[key] = el)}
-                                />
-                            ))}
-                        </div>
+                        <>
+                            <ul className="nav nav-tabs">
+                                {reportComponents.map(({ key, label }) => (
+                                    <li className="nav-item" key={key}>
+                                        <button className={`nav-link ${activeTab === key ? 'active' : ''}`} onClick={() => setActiveTab(key)}>
+                                            {label}
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                            <div className="tab-content pt-3">
+                                {reportComponents.map(({ key, Component, props }) => (
+                                    <div className={`tab-pane fade ${activeTab === key ? 'show active' : ''}`} key={key}>
+                                        <div className="row">
+                                            <Component {...props} ref={el => (reportRefs.current[key] = el)} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
                     )}
                 </div>
             </div>
