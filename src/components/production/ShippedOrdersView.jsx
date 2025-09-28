@@ -87,14 +87,27 @@ const ShippedOrdersView = ({ user }) => {
         );
     };
 
-    const filteredOrders = useMemo(() => {
-        return shippedOrders.filter(order => {
+    const groupedAndFilteredOrders = useMemo(() => {
+        const filtered = shippedOrders.filter(order => {
             if (!searchTerm) return true;
             const lowercasedFilter = searchTerm.toLowerCase();
             return Object.values(order).some(value =>
                 String(value).toLowerCase().includes(lowercasedFilter)
             );
         });
+
+        const grouped = filtered.reduce((acc, order) => {
+            const customer = order.customerCompanyName || 'Unknown Customer';
+            if (!acc[customer]) acc[customer] = [];
+            acc[customer].push(order);
+            return acc;
+        }, {});
+
+        for (const customer in grouped) {
+            grouped[customer].sort((a,b) => (a.deliveryDate || "").localeCompare(b.deliveryDate || ""));
+        }
+
+        return grouped;
     }, [shippedOrders, searchTerm]);
 
     if (isLoading) {
@@ -120,43 +133,48 @@ const ShippedOrdersView = ({ user }) => {
                         <tr>
                             <th>Aqua Order #</th>
                             <th>Customer PO</th>
-                            <th>Customer</th>
                             <th>Order Description</th>
                             <th>Qty</th>
                             <th>Delivery Date</th>
                             <th style={{ width: '200px' }}>Revert Status To</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {filteredOrders.map(order => (
-                            <tr key={order.id}>
-                                <td>
-                                    <a href="#" onClick={(e) => { e.preventDefault(); setViewingHistoryFor(order); }}>
-                                        {order.aquaOrderNumber}
-                                    </a>
-                                </td>
-                                <td>{order.customerPO}</td>
-                                <td>{order.customerCompanyName}</td>
-                                <td>{`${order.productName} - ${order.material} - ${order.size}`}</td>
-                                <td>{order.quantity}</td>
-                                <td>{order.deliveryDate}</td>
-                                <td>
-                                    <select
-                                        className="form-select form-select-sm"
-                                        value={''} // Always show placeholder
-                                        onChange={(e) => handleStatusChange(order, e.target.value)}
-                                    >
-                                        <option value="" disabled>Change Status...</option>
-                                        {getValidStatuses(order).map(s => (
-                                            <option key={s.id} value={s.id}>{s.description}</option>
-                                        ))}
-                                    </select>
-                                </td>
+                    {Object.keys(groupedAndFilteredOrders).sort().map(customerName => (
+                        <tbody key={customerName}>
+                            <tr className="table-light">
+                                <th colSpan="6" className="ps-2">
+                                    {customerName} ({groupedAndFilteredOrders[customerName].length} Orders)
+                                </th>
                             </tr>
-                        ))}
-                    </tbody>
+                            {groupedAndFilteredOrders[customerName].map(order => (
+                                <tr key={order.id}>
+                                    <td>
+                                        <a href="#" onClick={(e) => { e.preventDefault(); setViewingHistoryFor(order); }}>
+                                            {order.aquaOrderNumber}
+                                        </a>
+                                    </td>
+                                    <td>{order.customerPO}</td>
+                                    <td>{`${order.productName} - ${order.material} - ${order.size}`}</td>
+                                    <td>{order.quantity}</td>
+                                    <td>{order.deliveryDate}</td>
+                                    <td>
+                                        <select
+                                            className="form-select form-select-sm"
+                                            value={''} // Always show placeholder
+                                            onChange={(e) => handleStatusChange(order, e.target.value)}
+                                        >
+                                            <option value="" disabled>Change Status...</option>
+                                            {getValidStatuses(order).map(s => (
+                                                <option key={s.id} value={s.id}>{s.description}</option>
+                                            ))}
+                                        </select>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    ))}
                 </table>
-                {filteredOrders.length === 0 && <p className="text-center text-muted mt-3">No shipped orders found.</p>}
+                {Object.keys(groupedAndFilteredOrders).length === 0 && !isLoading && <p className="text-center text-muted mt-3">No shipped orders found.</p>}
             </div>
 
             {stoppingOrder && (
