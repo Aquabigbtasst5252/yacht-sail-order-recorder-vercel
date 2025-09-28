@@ -2,12 +2,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { db } from '../../firebase';
-import { collection, query, where, onSnapshot, doc, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import OrderHistoryModal from '../modals/OrderHistoryModal';
+import { PRODUCTION_STATUSES } from '../../constants';
 
 const ShippedOrdersView = ({ user }) => {
     const [shippedOrders, setShippedOrders] = useState([]);
-    const [productionStatuses, setProductionStatuses] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
@@ -24,19 +24,13 @@ const ShippedOrdersView = ({ user }) => {
             setIsLoading(false);
         });
 
-        const statusesQuery = query(collection(db, "productionStatuses"), orderBy("order"));
-        const unsubStatuses = onSnapshot(statusesQuery, (snap) => {
-            setProductionStatuses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
-
         return () => {
             unsubOrders();
-            unsubStatuses();
         };
     }, [user]);
 
     const updateOrderStatus = async (order, newStatusId, reason = null) => {
-        const newStatus = productionStatuses.find(s => s.id === newStatusId);
+        const newStatus = PRODUCTION_STATUSES.find(s => s.id === newStatusId);
         if (!newStatus) return;
 
         const historyRef = collection(db, "orders", order.id, "statusHistory");
@@ -48,7 +42,7 @@ const ShippedOrdersView = ({ user }) => {
             revertedFrom: "Shipped"
         };
         const orderRef = doc(db, "orders", order.id);
-        const orderUpdate = { status: newStatus.description, statusId: newStatusId };
+        const orderUpdate = { status: newStatus.description, statusId: newStatus.id };
 
         const batch = writeBatch(db);
         batch.update(orderRef, orderUpdate);
@@ -58,7 +52,7 @@ const ShippedOrdersView = ({ user }) => {
     };
 
     const handleStatusChange = (order, newStatusId) => {
-        const newStatus = productionStatuses.find(s => s.id === newStatusId);
+        const newStatus = PRODUCTION_STATUSES.find(s => s.id === newStatusId);
         if (!newStatus) return;
 
         if (newStatus.description.toLowerCase() === 'temporary stop') {
@@ -79,12 +73,9 @@ const ShippedOrdersView = ({ user }) => {
         setStopReason('');
     };
 
-    const getValidStatuses = (order) => {
-        return productionStatuses.filter(status =>
-            order.orderTypeId && order.productId &&
-            status.orderTypeIds?.includes(order.orderTypeId) &&
-            status.productTypeIds?.includes(order.productId)
-        );
+    const getValidStatuses = () => {
+        // Shipped orders can be reverted to any status except 'Shipped'
+        return PRODUCTION_STATUSES.filter(status => status.id !== 'shipped');
     };
 
     const groupedAndFilteredOrders = useMemo(() => {
@@ -164,7 +155,7 @@ const ShippedOrdersView = ({ user }) => {
                                             onChange={(e) => handleStatusChange(order, e.target.value)}
                                         >
                                             <option value="" disabled>Change Status...</option>
-                                            {getValidStatuses(order).map(s => (
+                                        {getValidStatuses().map(s => (
                                                 <option key={s.id} value={s.id}>{s.description}</option>
                                             ))}
                                         </select>

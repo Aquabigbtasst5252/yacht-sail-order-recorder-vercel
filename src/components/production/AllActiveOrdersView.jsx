@@ -3,13 +3,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import DatePicker from "react-datepicker";
 import toast from 'react-hot-toast';
 import { db } from '../../firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, writeBatch, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { getWeekStringFromDate } from '../../helpers';
 import OrderHistoryModal from '../modals/OrderHistoryModal';
+import { PRODUCTION_STATUSES } from '../../constants';
 
 const AllActiveOrdersView = ({ user }) => {
     const [activeOrders, setActiveOrders] = useState([]);
-    const [productionStatuses, setProductionStatuses] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
@@ -43,12 +43,7 @@ const AllActiveOrdersView = ({ user }) => {
             setIsLoading(false);
         });
 
-        const statusesQuery = query(collection(db, "productionStatuses"), orderBy("order"));
-        const unsubStatuses = onSnapshot(statusesQuery, (snap) => {
-            setProductionStatuses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
-
-        return () => { unsubOrders(); unsubStatuses(); };
+        return () => { unsubOrders(); };
     }, [user, isCustomer]);
 
     const toYYYYMMDD = (date) => {
@@ -70,13 +65,13 @@ const AllActiveOrdersView = ({ user }) => {
     };
 
     const updateOrderStatus = async (order, newStatusId, reason = null) => {
-        const newStatus = productionStatuses.find(s => s.id === newStatusId);
+        const newStatus = PRODUCTION_STATUSES.find(s => s.id === newStatusId);
         if (!newStatus) return;
 
         const historyRef = collection(db, "orders", order.id, "statusHistory");
         const historyEntry = { status: newStatus.description, changedBy: user.name, timestamp: serverTimestamp(), ...(reason && { reason }) };
         const orderRef = doc(db, "orders", order.id);
-        const orderUpdate = { status: newStatus.description, statusId: newStatusId };
+        const orderUpdate = { status: newStatus.description, statusId: newStatus.id };
 
         const batch = writeBatch(db);
         batch.update(orderRef, orderUpdate);
@@ -86,7 +81,7 @@ const AllActiveOrdersView = ({ user }) => {
     };
 
     const handleStatusChange = (order, newStatusId) => {
-        const newStatus = productionStatuses.find(s => s.id === newStatusId);
+        const newStatus = PRODUCTION_STATUSES.find(s => s.id === newStatusId);
         if (!newStatus) return;
 
         if (newStatus.description.toLowerCase() === 'temporary stop') {
@@ -107,12 +102,9 @@ const AllActiveOrdersView = ({ user }) => {
         setStopReason('');
     };
 
-    const getValidStatuses = (order) => {
-        return productionStatuses.filter(status =>
-            order.orderTypeId && order.productId &&
-            status.orderTypeIds?.includes(order.orderTypeId) &&
-            status.productTypeIds?.includes(order.productId)
-        );
+    const getValidStatuses = () => {
+        // Return all statuses except 'Shipped' for active orders
+        return PRODUCTION_STATUSES.filter(status => status.id !== 'shipped');
     };
 
     const groupedAndFilteredOrders = useMemo(() => {
@@ -201,10 +193,10 @@ const AllActiveOrdersView = ({ user }) => {
                                             className="form-select form-select-sm"
                                             value={order.statusId || ''}
                                             onChange={(e) => handleStatusChange(order, e.target.value)}
-                                            disabled={isCustomer || order.status?.toLowerCase() === 'shipped'}
+                                            disabled={isCustomer}
                                         >
                                             <option value="" disabled>{order.status || 'Change...'}</option>
-                                            {getValidStatuses(order).map(s => <option key={s.id} value={s.id}>{s.description}</option>)}
+                                            {getValidStatuses().map(s => <option key={s.id} value={s.id}>{s.description}</option>)}
                                         </select>
                                     </td>
                                 </tr>
