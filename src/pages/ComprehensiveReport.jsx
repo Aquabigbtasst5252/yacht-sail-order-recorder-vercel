@@ -1,7 +1,7 @@
 // src/pages/ComprehensiveReport.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, onSnapshot, orderBy, limit } from "firebase/firestore";
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from 'date-fns';
@@ -37,29 +37,31 @@ const ComprehensiveReport = () => {
     useEffect(() => {
         setLoading(true);
 
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-
-        if (!startDate || !endDate) return;
-
-        const ordersQuery = query(collection(db, "orders"), where("orderDate", ">=", start), where("orderDate", "<=", end));
+        // Fetch the most recent 1000 records to balance performance and data availability
+        const ordersQuery = query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(1000));
         const unsubOrders = onSnapshot(ordersQuery, (snap) => {
-            setAllOrders(snap.docs.map(d => ({ id: d.id, ...d.data(), orderDate: d.data().orderDate?.toDate() })));
+            const data = snap.docs.map(d => ({
+                id: d.id, ...d.data(),
+                // Use createdAt for filtering, but keep orderDate for any other logic
+                orderDate: d.data().orderDate?.toDate(),
+                createdAt: d.data().createdAt?.toDate()
+            }));
+            setAllOrders(data);
         }, (err) => console.error("Error fetching orders:", err));
 
-        const breakdownsQuery = query(collection(db, "machineBreakdowns"), where("startTime", ">=", start), where("startTime", "<=", end));
+        const breakdownsQuery = query(collection(db, "machineBreakdowns"), orderBy("createdAt", "desc"), limit(1000));
         const unsubBreakdowns = onSnapshot(breakdownsQuery, (snap) => {
-            setMachineBreakdowns(snap.docs.map(d => ({ id: d.id, ...d.data(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() })));
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() }));
+            setMachineBreakdowns(data);
         }, (err) => console.error("Error fetching machine breakdowns:", err));
 
-        const lostTimeQuery = query(collection(db, "lostTimeEntries"), where("startDate", ">=", start), where("startDate", "<=", end));
+        const lostTimeQuery = query(collection(db, "lostTimeEntries"), orderBy("createdAt", "desc"), limit(1000));
         const unsubLostTime = onSnapshot(lostTimeQuery, (snap) => {
-            setLostTimeEntries(snap.docs.map(d => ({ id: d.id, ...d.data(), startDate: d.data().startDate?.toDate(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() })));
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), startDate: d.data().startDate?.toDate(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() }));
+            setLostTimeEntries(data);
         }, (err) => console.error("Error fetching lost time entries:", err));
 
-        const timer = setTimeout(() => setLoading(false), 1500);
+        const timer = setTimeout(() => setLoading(false), 2500); // Allow time for all queries
 
         return () => {
             unsubOrders();
@@ -67,7 +69,34 @@ const ComprehensiveReport = () => {
             unsubLostTime();
             clearTimeout(timer);
         };
-    }, [startDate, endDate]);
+    }, []);
+
+    const dateRangeFilter = (items, dateField) => {
+        if (!startDate || !endDate) return items;
+
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        return items.filter(item => {
+            // Use the specified date field for filtering. Fallback to createdAt for orders if needed.
+            let itemDate = item[dateField];
+            if (dateField === 'orderDate' && !itemDate) {
+                itemDate = item.createdAt;
+            }
+
+            if (itemDate && typeof itemDate.getTime === 'function' && !isNaN(itemDate.getTime())) {
+                return itemDate >= start && itemDate <= end;
+            }
+            return false;
+        });
+    };
+
+    const filteredOrders = useMemo(() => dateRangeFilter(allOrders, 'orderDate'), [startDate, endDate, allOrders]);
+    const filteredBreakdowns = useMemo(() => dateRangeFilter(machineBreakdowns, 'startTime'), [startDate, endDate, machineBreakdowns]);
+    const filteredLostTime = useMemo(() => dateRangeFilter(lostTimeEntries, 'startDate'), [startDate, endDate, lostTimeEntries]);
+
 
     const handleExportPDF = () => {
         setIsExporting(true);
@@ -98,7 +127,7 @@ const ComprehensiveReport = () => {
 
                 const { title, tableData, headers, chart } = report;
                 const chartImage = chart.toBase64Image();
-                const chartHeight = 80; // Adjusted for a larger chart area
+                const chartHeight = 80;
                 const tableHeight = (tableData.length + 1) * 5 + 10;
                 const sectionHeight = chartHeight + tableHeight + 20;
 
@@ -132,16 +161,16 @@ const ComprehensiveReport = () => {
     };
 
     const reportComponents = [
-        { key: 'salesByCustomerSails', label: 'Sales by Customer (Sails)', Component: SalesByCustomerSails, props: { orders: allOrders } },
-        { key: 'salesByCustomerAccessories', label: 'Sales by Customer (Acc.)', Component: SalesByCustomerAccessories, props: { orders: allOrders } },
-        { key: 'monthlyOrdersSails', label: 'Monthly Orders (Sails)', Component: MonthlyOrdersSails, props: { orders: allOrders } },
-        { key: 'monthlyOrdersAccessories', label: 'Monthly Orders (Acc.)', Component: MonthlyOrdersAccessories, props: { orders: allOrders } },
-        { key: 'monthlyMaterialUsageSails', label: 'Material Usage (Sails)', Component: MonthlyMaterialUsageSails, props: { orders: allOrders } },
-        { key: 'monthlyMaterialUsageAccessories', label: 'Material Usage (Acc.)', Component: MonthlyMaterialUsageAccessories, props: { orders: allOrders } },
-        { key: 'productTypeAnalysisSails', label: 'Product Analysis (Sails)', Component: ProductTypeAnalysisSails, props: { orders: allOrders } },
-        { key: 'productTypeAnalysisAccessories', label: 'Product Analysis (Acc.)', Component: ProductTypeAnalysisAccessories, props: { orders: allOrders } },
-        { key: 'machineBreakdown', label: 'Machine Breakdowns', Component: MachineBreakdownReport, props: { breakdowns: machineBreakdowns } },
-        { key: 'lostTime', label: 'Lost Time', Component: LostTimeReport, props: { lostTimeEntries: lostTimeEntries } },
+        { key: 'salesByCustomerSails', label: 'Sales by Customer (Sails)', Component: SalesByCustomerSails, props: { orders: filteredOrders } },
+        { key: 'salesByCustomerAccessories', label: 'Sales by Customer (Acc.)', Component: SalesByCustomerAccessories, props: { orders: filteredOrders } },
+        { key: 'monthlyOrdersSails', label: 'Monthly Orders (Sails)', Component: MonthlyOrdersSails, props: { orders: filteredOrders } },
+        { key: 'monthlyOrdersAccessories', label: 'Monthly Orders (Acc.)', Component: MonthlyOrdersAccessories, props: { orders: filteredOrders } },
+        { key: 'monthlyMaterialUsageSails', label: 'Material Usage (Sails)', Component: MonthlyMaterialUsageSails, props: { orders: filteredOrders } },
+        { key: 'monthlyMaterialUsageAccessories', label: 'Material Usage (Acc.)', Component: MonthlyMaterialUsageAccessories, props: { orders: filteredOrders } },
+        { key: 'productTypeAnalysisSails', label: 'Product Analysis (Sails)', Component: ProductTypeAnalysisSails, props: { orders: filteredOrders } },
+        { key: 'productTypeAnalysisAccessories', label: 'Product Analysis (Acc.)', Component: ProductTypeAnalysisAccessories, props: { orders: filteredOrders } },
+        { key: 'machineBreakdown', label: 'Machine Breakdowns', Component: MachineBreakdownReport, props: { breakdowns: filteredBreakdowns } },
+        { key: 'lostTime', label: 'Lost Time', Component: LostTimeReport, props: { lostTimeEntries: filteredLostTime } },
     ];
 
     return (
