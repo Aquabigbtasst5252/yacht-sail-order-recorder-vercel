@@ -13,9 +13,26 @@ const Dashboard = ({ user }) => {
 
     const getStatusBadgeClass = (status) => {
         const lowerCaseStatus = status?.toLowerCase() || '';
-        if (lowerCaseStatus === 'temporary stop') return 'bg-danger';
-        if (lowerCaseStatus === 'shipped') return 'bg-success';
-        return 'bg-primary';
+        const primary = [
+            'panel received', 'panel sticking', 'sail joint sticking', 'batten pocket sticking',
+            'patch sticking', 'loop sticking', 'flat tape sticking', 'insignia stick around sail',
+            'luff tape sticking', 'uv sticking', 'foam cover stick'
+        ];
+        const success = [
+            'panel sewing', 'sail joint sewing', 'batten pocket sewing', 'patch sewing',
+            'loop sewing', 'flat tape sewing', 'leech / foot taping sewing', 'uv sewing',
+            'foam cover sewing', 'luff tape sewing'
+        ];
+        const info = ['sail recut', 'webbing', 'end control'];
+        const warning = ['finished', 'shipped'];
+        const danger = ['temporary stop'];
+
+        if (primary.includes(lowerCaseStatus)) return 'bg-primary';
+        if (success.includes(lowerCaseStatus)) return 'bg-success';
+        if (info.includes(lowerCaseStatus)) return 'bg-info';
+        if (warning.includes(lowerCaseStatus)) return 'bg-warning';
+        if (danger.includes(lowerCaseStatus)) return 'bg-danger';
+        return 'bg-secondary'; // Default color
     };
 
     useEffect(() => {
@@ -82,6 +99,8 @@ const Dashboard = ({ user }) => {
                                         {user.role === 'customer' && <th>Customer</th>}
                                         <th>Customer PO</th>
                                         <th>Product</th>
+                                        <th>PO Qty</th>
+                                        <th>Ship Qty</th>
                                         <th>Status</th>
                                     </tr>
                                 </thead>
@@ -93,6 +112,8 @@ const Dashboard = ({ user }) => {
                                                 <td>{order.customerCompanyName}</td>
                                                 <td>{order.customerPO}</td>
                                                 <td>{order.productName}</td>
+                                                <td>{order.quantity}</td>
+                                                <td>{order.shipQty || 'N/A'}</td>
                                                 <td><span className={`badge ${getStatusBadgeClass(order.status)}`}>{order.status}</span></td>
                                             </tr>
                                         ))}
@@ -101,13 +122,15 @@ const Dashboard = ({ user }) => {
                                     Object.keys(ordersByCustomer).sort().map(customerName => (
                                         <tbody key={customerName}>
                                             <tr className="table-light">
-                                                <th colSpan="4" className="ps-2">{customerName}</th>
+                                                <th colSpan="5" className="ps-2">{customerName}</th>
                                             </tr>
                                             {ordersByCustomer[customerName].map(order => (
                                                 <tr key={order.id}>
                                                     <td><a href="#" onClick={(e) => { e.preventDefault(); setViewingHistoryFor(order); }}>{order.aquaOrderNumber}</a></td>
                                                     <td>{order.customerPO}</td>
                                                     <td>{order.productName}</td>
+                                                    <td>{order.quantity}</td>
+                                                    <td>{order.shipQty || 'N/A'}</td>
                                                     <td><span className={`badge ${getStatusBadgeClass(order.status)}`}>{order.status}</span></td>
                                                 </tr>
                                             ))}
