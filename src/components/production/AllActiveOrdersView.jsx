@@ -64,6 +64,16 @@ const AllActiveOrdersView = ({ user }) => {
         });
     };
 
+    const handleShipQtyChange = async (orderId, newShipQty) => {
+        if(isCustomer) return;
+        const qty = Number(newShipQty);
+        if (isNaN(qty) || qty < 0) {
+            toast.error("Invalid quantity");
+            return;
+        }
+        await updateDoc(doc(db, "orders", orderId), { shipQty: qty });
+    };
+
     const updateOrderStatus = async (order, newStatusId, reason = null) => {
         const newStatus = PRODUCTION_STATUSES.find(s => s.id === newStatusId);
         if (!newStatus) return;
@@ -155,14 +165,15 @@ const AllActiveOrdersView = ({ user }) => {
                             <th>Customer PO</th>
                             <th>IFS Order #</th>
                             <th>Order Description</th>
-                            <th>Qty</th>
+                            <th>PO Qty</th>
+                            <th>Ship Qty</th>
                             <th style={{width: '150px'}}>Delivery Date</th>
                             <th style={{width: '200px'}}>Production Status</th>
                         </tr>
                     </thead>
                     {Object.keys(groupedAndFilteredOrders).sort().map(customerName => (
                         <tbody key={customerName}>
-                            <tr className="table-light"><th colSpan="7" className="ps-2">{customerName}</th></tr>
+                            <tr className="table-light"><th colSpan="8" className="ps-2">{customerName}</th></tr>
                             {groupedAndFilteredOrders[customerName].map(order => (
                                 <tr key={order.id}>
                                     <td>
@@ -174,6 +185,15 @@ const AllActiveOrdersView = ({ user }) => {
                                     <td>{order.ifsOrderNo}</td>
                                     <td>{`${order.productName} - ${order.material} - ${order.size}`}</td>
                                     <td>{order.quantity}</td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            className="form-control form-control-sm"
+                                            defaultValue={order.shipQty ?? order.quantity}
+                                            onBlur={(e) => handleShipQtyChange(order.id, e.target.value)}
+                                            disabled={isCustomer}
+                                        />
+                                    </td>
                                     <td>
                                         <DatePicker
                                             selected={order.deliveryDate ? new Date(order.deliveryDate.replace(/-/g, '/')) : null}

@@ -113,7 +113,7 @@ const Dashboard = ({ user }) => {
                                                 <td>{order.customerPO}</td>
                                                 <td>{order.productName}</td>
                                                 <td>{order.quantity}</td>
-                                                <td>{order.shipQty ?? 'N/A'}</td>
+                                                <td>{order.shipQty ?? order.quantity}</td>
                                                 <td><span className={`badge ${getStatusBadgeClass(order.status)}`}>{order.status}</span></td>
                                             </tr>
                                         ))}
@@ -122,7 +122,7 @@ const Dashboard = ({ user }) => {
                                     Object.keys(ordersByCustomer).sort().map(customerName => (
                                         <tbody key={customerName}>
                                             <tr className="table-light">
-                                                <th colSpan="5" className="ps-2">{customerName}</th>
+                                                <th colSpan="6" className="ps-2">{customerName}</th>
                                             </tr>
                                             {ordersByCustomer[customerName].map(order => (
                                                 <tr key={order.id}>
@@ -130,7 +130,7 @@ const Dashboard = ({ user }) => {
                                                     <td>{order.customerPO}</td>
                                                     <td>{order.productName}</td>
                                                     <td>{order.quantity}</td>
-                                                    <td>{order.shipQty ?? 'N/A'}</td>
+                                                    <td>{order.shipQty ?? order.quantity}</td>
                                                     <td><span className={`badge ${getStatusBadgeClass(order.status)}`}>{order.status}</span></td>
                                                 </tr>
                                             ))}
