@@ -1,15 +1,17 @@
 // src/pages/ProductionScheduleReport.jsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
+import logo from '/logo.png';
 
 // --- PDF Document Component ---
 const SchedulePDFDocument = ({ ordersByCustomer, selectedWeekLabel }) => {
     const styles = StyleSheet.create({
         page: { paddingTop: 35, paddingBottom: 65, paddingHorizontal: 30, fontSize: 10, fontFamily: 'Helvetica' },
-        title: { fontSize: 18, textAlign: 'center', marginBottom: 20, fontFamily: 'Helvetica-Bold' },
+        headerContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 20, borderBottomWidth: 2, borderBottomColor: '#111', paddingBottom: 10 },
+        logo: { width: 50, height: 50, marginRight: 20 },
+        title: { fontSize: 18, textAlign: 'center', fontFamily: 'Helvetica-Bold' },
         customerHeader: { fontSize: 12, backgroundColor: '#f0f0f0', padding: 5, marginTop: 10, fontFamily: 'Helvetica-Bold' },
         table: { display: 'table', width: 'auto', borderStyle: 'solid', borderWidth: 1, borderRightWidth: 0, borderBottomWidth: 0 },
         tableRow: { flexDirection: 'row' },
@@ -25,7 +27,10 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeekLabel }) => {
     return (
         <Document>
             <Page style={styles.page} orientation="landscape">
-                <Text style={styles.title} fixed>{selectedWeekLabel} - Yacht Sail Production Schedule</Text>
+                <View style={styles.headerContainer} fixed>
+                    <Image style={styles.logo} src={logo} />
+                    <Text style={styles.title}>{selectedWeekLabel} - Yacht Sail Production Schedule</Text>
+                </View>
                 <View style={styles.table}>
                     <View style={styles.tableRow} fixed>
                         <Text style={styles.tableColHeader}>Aqua Order #</Text>
@@ -46,7 +51,7 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeekLabel }) => {
                                     <Text style={styles.tableCol}>{order.ifsOrderNo || ''}</Text>
                                     <Text style={descriptionColStyle}>{`${order.productName || ''} - ${order.material || ''} - ${order.size || ''}`}</Text>
                                     <Text style={styles.tableCol}>{order.quantity ?? ''}</Text>
-                                    <Text style={styles.tableCol}>{order.shipQty ?? ''}</Text>
+                                    <Text style={styles.tableCol}>{order.shipQty ?? order.quantity ?? ''}</Text>
                                     <Text style={styles.tableCol}>{order.deliveryDate ?? ''}</Text>
                                 </View>
                             ))}
@@ -62,75 +67,87 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeekLabel }) => {
     );
 };
 
+const getWeek = (date) => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+};
+
+const getCurrentWeek = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const week = getWeek(now);
+    return `${year}-${String(week).padStart(2, '0')}`;
+};
+
 // --- Main Production Schedule Report Page Component ---
 const ProductionScheduleReport = () => {
     const [allOrders, setAllOrders] = useState([]);
-    const [groupedOrders, setGroupedOrders] = useState({});
+    const [deliveryWeeks, setDeliveryWeeks] = useState([]);
     const [selectedWeek, setSelectedWeek] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
-    const getWeekId = (date) => {
-        if (!date) return null;
-        const validDate = typeof date === 'string' ? parseISO(date) : date;
-        if (isNaN(validDate)) return null;
-        const start = startOfWeek(validDate, { weekStartsOn: 1 });
-        return format(start, 'yyyy-MM-dd');
-    };
-
     useEffect(() => {
-        const ordersQuery = query(collection(db, "orders"), where("status", "in", ["New", "In Production", "Temporary Stop"]));
+        const ordersQuery = query(collection(db, "orders"), where("status", "!=", "Cancelled"));
         const unsubscribe = onSnapshot(ordersQuery, (snap) => {
             const ordersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             setAllOrders(ordersData);
-
-            const ordersByWeek = ordersData.reduce((acc, order) => {
-                if (order.deliveryDate) {
-                    const weekId = getWeekId(order.deliveryDate);
-                    if (weekId) {
-                        if (!acc[weekId]) acc[weekId] = [];
-                        acc[weekId].push(order);
-                    }
-                }
-                return acc;
-            }, {});
-            setGroupedOrders(ordersByWeek);
-
-            const currentWeekId = getWeekId(new Date());
-            if (ordersByWeek[currentWeekId]) {
-                setSelectedWeek(currentWeekId);
-            } else {
-                // If current week has no orders, select the most recent week with orders
-                const availableWeeks = Object.keys(ordersByWeek).sort().reverse();
-                if(availableWeeks.length > 0) {
-                    setSelectedWeek(availableWeeks[0]);
-                }
-            }
+            const weeks = [...new Set(ordersData.map(o => o.deliveryWeek).filter(Boolean))];
+            weeks.sort();
+            setDeliveryWeeks(weeks);
             setIsLoading(false);
         });
 
         return () => unsubscribe();
     }, []);
 
+    useEffect(() => {
+        if (deliveryWeeks.length > 0) {
+            setSelectedWeek(prevSelectedWeek => {
+                // Only set a default week if one isn't already selected or if the selected one is no longer valid.
+                if (!prevSelectedWeek || !deliveryWeeks.includes(prevSelectedWeek)) {
+                    const currentWeek = getCurrentWeek();
+                    if (deliveryWeeks.includes(currentWeek)) {
+                        return currentWeek;
+                    }
+                    const futureWeeks = deliveryWeeks.filter(w => w > currentWeek);
+                    if (futureWeeks.length > 0) {
+                        return futureWeeks[0];
+                    }
+                    if (deliveryWeeks.length > 0) {
+                        return deliveryWeeks[deliveryWeeks.length - 1];
+                    }
+                }
+                return prevSelectedWeek; // No change needed
+            });
+        }
+    }, [deliveryWeeks]);
+
     const ordersByCustomer = useMemo(() => {
-        if (!selectedWeek || !groupedOrders[selectedWeek]) return {};
-        return groupedOrders[selectedWeek].reduce((acc, order) => {
+        if (!selectedWeek || !allOrders.length) return {};
+        const weekOrders = allOrders.filter(o => o.deliveryWeek === selectedWeek && o.status?.toLowerCase() !== 'shipped');
+        return weekOrders.reduce((acc, order) => {
             const customer = order.customerCompanyName || 'Unknown Customer';
             if (!acc[customer]) acc[customer] = [];
             acc[customer].push(order);
             return acc;
         }, {});
-    }, [selectedWeek, groupedOrders]);
+    }, [selectedWeek, allOrders]);
 
     const weekOptions = useMemo(() => {
-        return Object.keys(groupedOrders).sort().map(weekId => {
-            const startDate = format(parseISO(weekId), 'MMM d');
-            const endDate = format(endOfWeek(parseISO(weekId), { weekStartsOn: 1 }), 'MMM d, yyyy');
+        return deliveryWeeks.map(weekId => {
+            if (typeof weekId !== 'string' || !weekId.includes('-')) return null;
+            const [year, weekNumber] = weekId.split('-');
+            const parsedWeekNumber = parseInt(weekNumber, 10);
+            if (isNaN(parsedWeekNumber)) return null;
             return {
                 value: weekId,
-                label: `Week of ${startDate} - ${endDate}`
+                label: `Week ${parsedWeekNumber}, ${year}`
             };
-        });
-    }, [groupedOrders]);
+        }).filter(Boolean);
+    }, [deliveryWeeks]);
 
     const selectedWeekLabel = weekOptions.find(opt => opt.value === selectedWeek)?.label || 'Production Schedule';
 
@@ -151,7 +168,7 @@ const ProductionScheduleReport = () => {
                             </div>
                             <PDFDownloadLink
                                 document={<SchedulePDFDocument ordersByCustomer={ordersByCustomer} selectedWeekLabel={selectedWeekLabel} />}
-                                fileName={selectedWeek ? `production_schedule_${selectedWeek}.pdf` : 'production_schedule.pdf'}
+                                fileName={selectedWeek ? `production_schedule_${selectedWeekLabel.replace(/\s/g, '_')}.pdf` : 'production_schedule.pdf'}
                                 className={`btn btn-primary btn-lg ${!selectedWeek ? 'disabled' : ''}`}
                                 style={!selectedWeek ? { pointerEvents: 'none' } : {}}>
                                 {({ loading }) => (loading ? 'Generating PDF...' : 'Export to PDF')}
@@ -177,7 +194,7 @@ const ProductionScheduleReport = () => {
                                                 <td>{order.ifsOrderNo || ''}</td>
                                                 <td>{`${order.productName || ''} - ${order.material || ''} - ${order.size || ''}`}</td>
                                                 <td>{order.quantity ?? ''}</td>
-                                                <td>{order.shipQty ?? ''}</td>
+                                                <td>{order.shipQty ?? order.quantity ?? ''}</td>
                                                 <td>{order.deliveryDate ?? ''}</td>
                                             </tr>
                                         ))}
