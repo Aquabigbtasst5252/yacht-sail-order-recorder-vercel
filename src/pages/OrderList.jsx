@@ -241,7 +241,7 @@ const OrderList = ({ user }) => {
                                                 style={{ width: '80px' }}
                                             />
                                         ) : (
-                                            order.shipQty || order.quantity
+                                            order.shipQty ?? order.quantity
                                         )}
                                     </td>
                                     <td>
