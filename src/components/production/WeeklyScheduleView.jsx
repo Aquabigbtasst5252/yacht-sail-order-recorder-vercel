@@ -4,6 +4,21 @@ import { db } from '../../firebase';
 import { collection, query, where, onSnapshot, orderBy, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import OrderHistoryModal from '../modals/OrderHistoryModal';
 
+const getWeek = (date) => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+};
+
+const getCurrentWeek = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const week = getWeek(now);
+    return `${year}-${String(week).padStart(2, '0')}`;
+};
+
 const WeeklyScheduleView = ({ user }) => {
     const [allOrders, setAllOrders] = useState([]);
     const [productionStatuses, setProductionStatuses] = useState([]);
@@ -13,6 +28,22 @@ const WeeklyScheduleView = ({ user }) => {
     const [stopReason, setStopReason] = useState('');
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
     const isCustomer = user.role === 'customer';
+
+    useEffect(() => {
+        if (deliveryWeeks.length > 0 && !selectedWeek) {
+            const currentWeek = getCurrentWeek();
+            if (deliveryWeeks.includes(currentWeek)) {
+                setSelectedWeek(currentWeek);
+            } else {
+                const futureWeeks = deliveryWeeks.filter(w => w > currentWeek);
+                if (futureWeeks.length > 0) {
+                    setSelectedWeek(futureWeeks[0]);
+                } else {
+                    setSelectedWeek(deliveryWeeks[deliveryWeeks.length - 1]);
+                }
+            }
+        }
+    }, [deliveryWeeks, selectedWeek]);
 
     useEffect(() => {
         if (!user) return;
