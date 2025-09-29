@@ -13,9 +13,9 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeekLabel }) => {
         customerHeader: { fontSize: 12, backgroundColor: '#f0f0f0', padding: 5, marginTop: 10, fontFamily: 'Helvetica-Bold' },
         table: { display: 'table', width: 'auto', borderStyle: 'solid', borderWidth: 1, borderRightWidth: 0, borderBottomWidth: 0 },
         tableRow: { flexDirection: 'row' },
-        tableColHeader: { width: '16.66%', borderStyle: 'solid', borderWidth: 1, borderLeftWidth: 0, borderTopWidth: 0, backgroundColor: '#e0e0e0', padding: 5, fontFamily: 'Helvetica-Bold' },
-        tableCol: { width: '16.66%', borderStyle: 'solid', borderWidth: 1, borderLeftWidth: 0, borderTopWidth: 0, padding: 5 },
-        descriptionCol: { width: '33.32%' },
+        tableColHeader: { width: '14.28%', borderStyle: 'solid', borderWidth: 1, borderLeftWidth: 0, borderTopWidth: 0, backgroundColor: '#e0e0e0', padding: 5, fontFamily: 'Helvetica-Bold' },
+        tableCol: { width: '14.28%', borderStyle: 'solid', borderWidth: 1, borderLeftWidth: 0, borderTopWidth: 0, padding: 5 },
+        descriptionCol: { width: '28.56%' },
         footer: { position: 'absolute', bottom: 30, left: 30, right: 30, flexDirection: 'row', justifyContent: 'space-between', fontSize: 9, color: 'grey' }
     });
 
@@ -32,7 +32,8 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeekLabel }) => {
                         <Text style={styles.tableColHeader}>Customer PO</Text>
                         <Text style={styles.tableColHeader}>IFS Order #</Text>
                         <Text style={descriptionHeaderStyle}>Order Description</Text>
-                        <Text style={styles.tableColHeader}>Qty</Text>
+                        <Text style={styles.tableColHeader}>PO Qty</Text>
+                        <Text style={styles.tableColHeader}>Ship Qty</Text>
                         <Text style={styles.tableColHeader}>Delivery Date</Text>
                     </View>
                     {Object.keys(ordersByCustomer).sort().map(customerName => (
@@ -45,6 +46,7 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeekLabel }) => {
                                     <Text style={styles.tableCol}>{order.ifsOrderNo || ''}</Text>
                                     <Text style={descriptionColStyle}>{`${order.productName || ''} - ${order.material || ''} - ${order.size || ''}`}</Text>
                                     <Text style={styles.tableCol}>{order.quantity || ''}</Text>
+                                    <Text style={styles.tableCol}>{order.shipQty || ''}</Text>
                                     <Text style={styles.tableCol}>{order.deliveryDate || ''}</Text>
                                 </View>
                             ))}
@@ -163,11 +165,11 @@ const ProductionScheduleReport = () => {
                     <div className="card-header"><h3 className="h5 mb-0">Production Schedule for {selectedWeekLabel}</h3></div>
                     <div className="card-body"><div className="table-responsive">
                         <table className="table table-bordered table-striped">
-                            <thead className="table-light"><tr><th>Aqua Order #</th><th>Customer PO</th><th>IFS Order #</th><th>Order Description</th><th>Qty</th><th>Delivery Date</th></tr></thead>
+                            <thead className="table-light"><tr><th>Aqua Order #</th><th>Customer PO</th><th>IFS Order #</th><th>Order Description</th><th>PO Qty</th><th>Ship Qty</th><th>Delivery Date</th></tr></thead>
                             <tbody>
                                 {Object.keys(ordersByCustomer).sort().map(customerName => (
                                     <React.Fragment key={customerName}>
-                                        <tr className="table-secondary"><td colSpan="6" className="fw-bold">{customerName}</td></tr>
+                                        <tr className="table-secondary"><td colSpan="7" className="fw-bold">{customerName}</td></tr>
                                         {ordersByCustomer[customerName].map(order => (
                                             <tr key={order.id}>
                                                 <td>{order.aquaOrderNumber || ''}</td>
@@ -175,6 +177,7 @@ const ProductionScheduleReport = () => {
                                                 <td>{order.ifsOrderNo || ''}</td>
                                                 <td>{`${order.productName || ''} - ${order.material || ''} - ${order.size || ''}`}</td>
                                                 <td>{order.quantity || ''}</td>
+                                                <td>{order.shipQty || ''}</td>
                                                 <td>{order.deliveryDate || ''}</td>
                                             </tr>
                                         ))}

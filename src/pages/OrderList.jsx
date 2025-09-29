@@ -18,6 +18,7 @@ import IhcDetailsModal from '../components/modals/IhcDetailsModal';
 const OrderList = ({ user }) => {
     const [orders, setOrders] = useState([]);
     const [editingOrder, setEditingOrder] = useState(null);
+    const [editableShipQty, setEditableShipQty] = useState({});
     const [qcOrder, setQcOrder] = useState(null);
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
     const [ihcOrder, setIhcOrder] = useState(null);
@@ -132,6 +133,39 @@ const OrderList = ({ user }) => {
         toast.success("Order updated successfully.");
         setEditingOrder(null);
     };
+
+    const handleShipQtyChange = (orderId, value) => {
+        setEditableShipQty(prev => ({ ...prev, [orderId]: value }));
+    };
+
+    const handleShipQtyUpdate = async (orderId) => {
+        if (editableShipQty[orderId] === undefined) return;
+
+        const originalOrder = orders.find(o => o.id === orderId);
+        const newQty = editableShipQty[orderId];
+
+        if (originalOrder && originalOrder.shipQty?.toString() === newQty) {
+            setEditableShipQty(prev => {
+                const newState = { ...prev };
+                delete newState[orderId];
+                return newState;
+            });
+            return;
+        }
+
+        try {
+            await updateDoc(doc(db, "orders", orderId), { shipQty: newQty });
+            toast.success("Ship Qty updated successfully.");
+            setEditableShipQty(prev => {
+                const newState = { ...prev };
+                delete newState[orderId];
+                return newState;
+            });
+        } catch (error) {
+            toast.error("Failed to update Ship Qty.");
+            console.error("Error updating Ship Qty: ", error);
+        }
+    };
     
     const indexOfLastEntry = currentPage * entriesPerPage;
     const indexOfFirstEntry = indexOfLastEntry - entriesPerPage;
@@ -176,7 +210,8 @@ const OrderList = ({ user }) => {
                                 <th>IFS Order No</th>
                                 {!isCustomer && <th>Customer</th>}
                                 <th>Order Description</th>
-                                <th>Qty</th>
+                                <th>PO Qty</th>
+                                <th>Ship Qty</th>
                                 <th>Actions</th>
                                 <th>Created By</th>
                             </tr>
@@ -195,6 +230,20 @@ const OrderList = ({ user }) => {
                                     {!isCustomer && <td>{order.customerCompanyName}</td>}
                                     <td>{`${order.productName} - ${order.material}`}</td>
                                     <td>{order.quantity}</td>
+                                    <td>
+                                        {user.role === 'super_admin' ? (
+                                            <input
+                                                type="text"
+                                                className="form-control form-control-sm"
+                                                value={editableShipQty[order.id] ?? (order.shipQty || order.quantity)}
+                                                onChange={(e) => handleShipQtyChange(order.id, e.target.value)}
+                                                onBlur={() => handleShipQtyUpdate(order.id)}
+                                                style={{ width: '80px' }}
+                                            />
+                                        ) : (
+                                            order.shipQty || order.quantity
+                                        )}
+                                    </td>
                                     <td>
                                         {!isCustomer ? (
                                             activeTab === 'ihc' ? (
