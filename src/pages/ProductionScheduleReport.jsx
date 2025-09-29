@@ -1,15 +1,18 @@
 // src/pages/ProductionScheduleReport.jsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
+import { startOfWeek, endOfWeek, format, parseISO, getISOWeek } from 'date-fns';
+import logo from '/logo.png';
 
 // --- PDF Document Component ---
 const SchedulePDFDocument = ({ ordersByCustomer, selectedWeekLabel }) => {
     const styles = StyleSheet.create({
         page: { paddingTop: 35, paddingBottom: 65, paddingHorizontal: 30, fontSize: 10, fontFamily: 'Helvetica' },
-        title: { fontSize: 18, textAlign: 'center', marginBottom: 20, fontFamily: 'Helvetica-Bold' },
+        headerContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 20, borderBottomWidth: 2, borderBottomColor: '#111', paddingBottom: 10 },
+        logo: { width: 50, height: 50, marginRight: 20 },
+        title: { fontSize: 18, textAlign: 'center', fontFamily: 'Helvetica-Bold' },
         customerHeader: { fontSize: 12, backgroundColor: '#f0f0f0', padding: 5, marginTop: 10, fontFamily: 'Helvetica-Bold' },
         table: { display: 'table', width: 'auto', borderStyle: 'solid', borderWidth: 1, borderRightWidth: 0, borderBottomWidth: 0 },
         tableRow: { flexDirection: 'row' },
@@ -25,7 +28,10 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeekLabel }) => {
     return (
         <Document>
             <Page style={styles.page} orientation="landscape">
-                <Text style={styles.title} fixed>{selectedWeekLabel} - Yacht Sail Production Schedule</Text>
+                <View style={styles.headerContainer} fixed>
+                    <Image style={styles.logo} src={logo} />
+                    <Text style={styles.title}>{selectedWeekLabel} - Yacht Sail Production Schedule</Text>
+                </View>
                 <View style={styles.table}>
                     <View style={styles.tableRow} fixed>
                         <Text style={styles.tableColHeader}>Aqua Order #</Text>
@@ -123,11 +129,14 @@ const ProductionScheduleReport = () => {
 
     const weekOptions = useMemo(() => {
         return Object.keys(groupedOrders).sort().map(weekId => {
-            const startDate = format(parseISO(weekId), 'MMM d');
-            const endDate = format(endOfWeek(parseISO(weekId), { weekStartsOn: 1 }), 'MMM d, yyyy');
+            const date = parseISO(weekId);
+            const weekNumber = getISOWeek(date);
+            const year = format(date, 'yyyy');
+            const startDate = format(date, 'MMM d');
+            const endDate = format(endOfWeek(date, { weekStartsOn: 1 }), 'MMM d');
             return {
                 value: weekId,
-                label: `Week of ${startDate} - ${endDate}`
+                label: `Week ${weekNumber}: ${startDate} - ${endDate}, ${year}`
             };
         });
     }, [groupedOrders]);
