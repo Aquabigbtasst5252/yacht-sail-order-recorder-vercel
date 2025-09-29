@@ -51,7 +51,7 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeekLabel }) => {
                                     <Text style={styles.tableCol}>{order.ifsOrderNo || ''}</Text>
                                     <Text style={descriptionColStyle}>{`${order.productName || ''} - ${order.material || ''} - ${order.size || ''}`}</Text>
                                     <Text style={styles.tableCol}>{order.quantity ?? ''}</Text>
-                                    <Text style={styles.tableCol}>{order.shipQty ?? ''}</Text>
+                                    <Text style={styles.tableCol}>{order.shipQty ?? order.quantity ?? ''}</Text>
                                     <Text style={styles.tableCol}>{order.deliveryDate ?? ''}</Text>
                                 </View>
                             ))}
@@ -132,11 +132,13 @@ const ProductionScheduleReport = () => {
 
     const weekOptions = useMemo(() => {
         return deliveryWeeks.map(weekId => {
-            if (!weekId) return null;
+            if (typeof weekId !== 'string' || !weekId.includes('-')) return null;
             const [year, weekNumber] = weekId.split('-');
+            const parsedWeekNumber = parseInt(weekNumber, 10);
+            if (isNaN(parsedWeekNumber)) return null;
             return {
                 value: weekId,
-                label: `Week ${parseInt(weekNumber, 10)}, ${year}`
+                label: `Week ${parsedWeekNumber}, ${year}`
             };
         }).filter(Boolean);
     }, [deliveryWeeks]);
@@ -186,7 +188,7 @@ const ProductionScheduleReport = () => {
                                                 <td>{order.ifsOrderNo || ''}</td>
                                                 <td>{`${order.productName || ''} - ${order.material || ''} - ${order.size || ''}`}</td>
                                                 <td>{order.quantity ?? ''}</td>
-                                                <td>{order.shipQty ?? ''}</td>
+                                                <td>{order.shipQty ?? order.quantity ?? ''}</td>
                                                 <td>{order.deliveryDate ?? ''}</td>
                                             </tr>
                                         ))}
