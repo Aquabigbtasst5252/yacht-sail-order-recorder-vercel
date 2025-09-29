@@ -113,7 +113,7 @@ const Dashboard = ({ user }) => {
                                                 <td>{order.customerPO}</td>
                                                 <td>{order.productName}</td>
                                                 <td>{order.quantity}</td>
-                                                <td>{order.shipQty || 'N/A'}</td>
+                                                <td>{order.shipQty ?? 'N/A'}</td>
                                                 <td><span className={`badge ${getStatusBadgeClass(order.status)}`}>{order.status}</span></td>
                                             </tr>
                                         ))}
@@ -130,7 +130,7 @@ const Dashboard = ({ user }) => {
                                                     <td>{order.customerPO}</td>
                                                     <td>{order.productName}</td>
                                                     <td>{order.quantity}</td>
-                                                    <td>{order.shipQty || 'N/A'}</td>
+                                                    <td>{order.shipQty ?? 'N/A'}</td>
                                                     <td><span className={`badge ${getStatusBadgeClass(order.status)}`}>{order.status}</span></td>
                                                 </tr>
                                             ))}

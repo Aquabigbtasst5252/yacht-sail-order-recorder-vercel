@@ -45,9 +45,9 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeekLabel }) => {
                                     <Text style={styles.tableCol}>{order.customerPO || ''}</Text>
                                     <Text style={styles.tableCol}>{order.ifsOrderNo || ''}</Text>
                                     <Text style={descriptionColStyle}>{`${order.productName || ''} - ${order.material || ''} - ${order.size || ''}`}</Text>
-                                    <Text style={styles.tableCol}>{order.quantity || ''}</Text>
-                                    <Text style={styles.tableCol}>{order.shipQty || ''}</Text>
-                                    <Text style={styles.tableCol}>{order.deliveryDate || ''}</Text>
+                                    <Text style={styles.tableCol}>{order.quantity ?? ''}</Text>
+                                    <Text style={styles.tableCol}>{order.shipQty ?? ''}</Text>
+                                    <Text style={styles.tableCol}>{order.deliveryDate ?? ''}</Text>
                                 </View>
                             ))}
                         </View>
@@ -176,9 +176,9 @@ const ProductionScheduleReport = () => {
                                                 <td>{order.customerPO || ''}</td>
                                                 <td>{order.ifsOrderNo || ''}</td>
                                                 <td>{`${order.productName || ''} - ${order.material || ''} - ${order.size || ''}`}</td>
-                                                <td>{order.quantity || ''}</td>
-                                                <td>{order.shipQty || ''}</td>
-                                                <td>{order.deliveryDate || ''}</td>
+                                                <td>{order.quantity ?? ''}</td>
+                                                <td>{order.shipQty ?? ''}</td>
+                                                <td>{order.deliveryDate ?? ''}</td>
                                             </tr>
                                         ))}
                                     </React.Fragment>
