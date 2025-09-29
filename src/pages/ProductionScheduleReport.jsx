@@ -3,7 +3,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { startOfWeek, endOfWeek, format, parseISO, getISOWeek } from 'date-fns';
 import logo from '/logo.png';
 
 // --- PDF Document Component ---
@@ -68,78 +67,79 @@ const SchedulePDFDocument = ({ ordersByCustomer, selectedWeekLabel }) => {
     );
 };
 
+const getWeek = (date) => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+};
+
+const getCurrentWeek = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const week = getWeek(now);
+    return `${year}-${String(week).padStart(2, '0')}`;
+};
+
 // --- Main Production Schedule Report Page Component ---
 const ProductionScheduleReport = () => {
     const [allOrders, setAllOrders] = useState([]);
-    const [groupedOrders, setGroupedOrders] = useState({});
+    const [deliveryWeeks, setDeliveryWeeks] = useState([]);
     const [selectedWeek, setSelectedWeek] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
-    const getWeekId = (date) => {
-        if (!date) return null;
-        const validDate = typeof date === 'string' ? parseISO(date) : date;
-        if (isNaN(validDate)) return null;
-        const start = startOfWeek(validDate, { weekStartsOn: 1 });
-        return format(start, 'yyyy-MM-dd');
-    };
-
     useEffect(() => {
-        const ordersQuery = query(collection(db, "orders"), where("status", "in", ["New", "In Production", "Temporary Stop"]));
+        const ordersQuery = query(collection(db, "orders"), where("status", "!=", "Cancelled"));
         const unsubscribe = onSnapshot(ordersQuery, (snap) => {
             const ordersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             setAllOrders(ordersData);
-
-            const ordersByWeek = ordersData.reduce((acc, order) => {
-                if (order.deliveryDate) {
-                    const weekId = getWeekId(order.deliveryDate);
-                    if (weekId) {
-                        if (!acc[weekId]) acc[weekId] = [];
-                        acc[weekId].push(order);
-                    }
-                }
-                return acc;
-            }, {});
-            setGroupedOrders(ordersByWeek);
-
-            const currentWeekId = getWeekId(new Date());
-            if (ordersByWeek[currentWeekId]) {
-                setSelectedWeek(currentWeekId);
-            } else {
-                // If current week has no orders, select the most recent week with orders
-                const availableWeeks = Object.keys(ordersByWeek).sort().reverse();
-                if(availableWeeks.length > 0) {
-                    setSelectedWeek(availableWeeks[0]);
-                }
-            }
+            const weeks = [...new Set(ordersData.map(o => o.deliveryWeek).filter(Boolean))];
+            weeks.sort();
+            setDeliveryWeeks(weeks);
             setIsLoading(false);
         });
 
         return () => unsubscribe();
     }, []);
 
+    useEffect(() => {
+        if (deliveryWeeks.length > 0 && !selectedWeek) {
+            const currentWeek = getCurrentWeek();
+            if (deliveryWeeks.includes(currentWeek)) {
+                setSelectedWeek(currentWeek);
+            } else {
+                const futureWeeks = deliveryWeeks.filter(w => w > currentWeek);
+                if (futureWeeks.length > 0) {
+                    setSelectedWeek(futureWeeks[0]);
+                } else if (deliveryWeeks.length > 0) {
+                    setSelectedWeek(deliveryWeeks[deliveryWeeks.length - 1]);
+                }
+            }
+        }
+    }, [deliveryWeeks, selectedWeek]);
+
     const ordersByCustomer = useMemo(() => {
-        if (!selectedWeek || !groupedOrders[selectedWeek]) return {};
-        return groupedOrders[selectedWeek].reduce((acc, order) => {
+        if (!selectedWeek || !allOrders.length) return {};
+        const weekOrders = allOrders.filter(o => o.deliveryWeek === selectedWeek && o.status?.toLowerCase() !== 'shipped');
+        return weekOrders.reduce((acc, order) => {
             const customer = order.customerCompanyName || 'Unknown Customer';
             if (!acc[customer]) acc[customer] = [];
             acc[customer].push(order);
             return acc;
         }, {});
-    }, [selectedWeek, groupedOrders]);
+    }, [selectedWeek, allOrders]);
 
     const weekOptions = useMemo(() => {
-        return Object.keys(groupedOrders).sort().map(weekId => {
-            const date = parseISO(weekId);
-            const weekNumber = getISOWeek(date);
-            const year = format(date, 'yyyy');
-            const startDate = format(date, 'MMM d');
-            const endDate = format(endOfWeek(date, { weekStartsOn: 1 }), 'MMM d');
+        return deliveryWeeks.map(weekId => {
+            if (!weekId) return null;
+            const [year, weekNumber] = weekId.split('-');
             return {
                 value: weekId,
-                label: `Week ${weekNumber}: ${startDate} - ${endDate}, ${year}`
+                label: `Week ${parseInt(weekNumber, 10)}, ${year}`
             };
-        });
-    }, [groupedOrders]);
+        }).filter(Boolean);
+    }, [deliveryWeeks]);
 
     const selectedWeekLabel = weekOptions.find(opt => opt.value === selectedWeek)?.label || 'Production Schedule';
 
@@ -160,7 +160,7 @@ const ProductionScheduleReport = () => {
                             </div>
                             <PDFDownloadLink
                                 document={<SchedulePDFDocument ordersByCustomer={ordersByCustomer} selectedWeekLabel={selectedWeekLabel} />}
-                                fileName={selectedWeek ? `production_schedule_${selectedWeek}.pdf` : 'production_schedule.pdf'}
+                                fileName={selectedWeek ? `production_schedule_${selectedWeekLabel.replace(/\s/g, '_')}.pdf` : 'production_schedule.pdf'}
                                 className={`btn btn-primary btn-lg ${!selectedWeek ? 'disabled' : ''}`}
                                 style={!selectedWeek ? { pointerEvents: 'none' } : {}}>
                                 {({ loading }) => (loading ? 'Generating PDF...' : 'Export to PDF')}
