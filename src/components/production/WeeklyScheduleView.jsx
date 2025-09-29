@@ -159,7 +159,7 @@ const WeeklyScheduleView = ({ user }) => {
                                     <th>Customer PO</th>
                                     <th>IFS Order #</th>
                                     <th>Order Description</th>
-                                    <th>Qty</th>
+                                    <th>Ship Qty</th>
                                     <th>Delivery Date</th>
                                     <th style={{width: '200px'}}>Production Status</th>
                                 </tr>
@@ -179,7 +179,7 @@ const WeeklyScheduleView = ({ user }) => {
                                             <td>{order.customerPO}</td>
                                             <td>{order.ifsOrderNo}</td>
                                             <td>{`${order.productName} - ${order.material} - ${order.size}`}</td>
-                                            <td>{order.quantity}</td>
+                                            <td>{order.shipQty ?? order.quantity}</td>
                                             <td>{order.deliveryDate}</td>
                                             <td>
                                                 <select 
@@ -207,8 +207,8 @@ const WeeklyScheduleView = ({ user }) => {
                             <div id="shipped-orders-collapse" className="accordion-collapse collapse">
                                 <div className="accordion-body p-0">
                                      <div className="table-responsive"><table className="table table-sm table-hover mb-0">
-                                        <thead><tr><th>Aqua Order #</th><th>Customer PO</th><th>Customer</th><th>Order Description</th><th>Qty</th><th>Delivery Date</th></tr></thead>
-                                        <tbody>{shippedOrders.map(order => <tr key={order.id} className="table-success"><td>{order.aquaOrderNumber}</td><td>{order.customerPO}</td><td>{order.customerCompanyName}</td><td>{`${order.productName} - ${order.material} - ${order.size}`}</td><td>{order.quantity}</td><td>{order.deliveryDate}</td></tr>)}</tbody>
+                                        <thead><tr><th>Aqua Order #</th><th>Customer PO</th><th>Customer</th><th>Order Description</th><th>Ship Qty</th><th>Delivery Date</th></tr></thead>
+                                        <tbody>{shippedOrders.map(order => <tr key={order.id} className="table-success"><td>{order.aquaOrderNumber}</td><td>{order.customerPO}</td><td>{order.customerCompanyName}</td><td>{`${order.productName} - ${order.material} - ${order.size}`}</td><td>{order.shipQty ?? order.quantity}</td><td>{order.deliveryDate}</td></tr>)}</tbody>
                                     </table></div>
                                 </div>
                             </div>

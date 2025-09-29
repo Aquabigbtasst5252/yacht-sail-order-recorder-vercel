@@ -92,6 +92,7 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
             customerPO,
             size,
             quantity: Number(quantity),
+            shipQty: Number(quantity),
             isIHC: isSailTypeSelected ? isIHC : false
         };
         
