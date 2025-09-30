@@ -8,7 +8,7 @@ const MonthlyOrdersAccessories = forwardRef(({ orders }, ref) => {
 
     const processedData = useMemo(() => {
         const monthlyAccessories = orders
-            .filter(order => order.productType === 'Accessory')
+            .filter(order => order.orderTypeName === 'Accessory')
             .reduce((acc, order) => {
                 const month = format(order.orderDate, 'yyyy-MM');
                 const quantity = Number(order.quantity) || 0;
