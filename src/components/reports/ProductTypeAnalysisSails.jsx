@@ -7,7 +7,7 @@ const ProductTypeAnalysisSails = forwardRef(({ orders }, ref) => {
 
     const processedData = useMemo(() => {
         const productQuantities = orders
-            .filter(order => order.productType === 'Sail')
+            .filter(order => order.orderTypeName === 'Sail')
             .reduce((acc, order) => {
                 const productName = order.productName || 'Unknown Product';
                 const quantity = Number(order.quantity) || 0;

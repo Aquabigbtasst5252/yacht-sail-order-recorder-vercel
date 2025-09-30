@@ -6,7 +6,7 @@ const SalesByCustomerSails = forwardRef(({ orders }, ref) => {
 
     const processedData = useMemo(() => {
         const salesByCustomer = orders
-            .filter(order => order.productType === 'Sail')
+            .filter(order => order.orderTypeName === 'Sail')
             .reduce((acc, order) => {
                 const customerName = order.customerCompanyName || 'Unknown Customer';
                 const quantity = Number(order.quantity) || 0;
