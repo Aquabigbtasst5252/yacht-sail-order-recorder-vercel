@@ -8,7 +8,7 @@ const MonthlyMaterialUsageSails = forwardRef(({ orders }, ref) => {
 
     const processedData = useMemo(() => {
         const materialUsage = orders
-            .filter(order => order.orderTypeName === 'Sail' && order.material)
+            .filter(order => order.orderTypeName === 'Sail' && order.material && order.orderDate)
             .reduce((acc, order) => {
                 const month = format(order.orderDate, 'yyyy-MM');
                 const material = order.material.trim();
