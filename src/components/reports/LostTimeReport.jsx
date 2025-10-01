@@ -2,13 +2,14 @@
 import React, { useMemo, forwardRef, useRef, useImperativeHandle } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { differenceInMinutes } from 'date-fns';
+import { sanitizeText } from '../../helpers';
 
 const LostTimeReport = forwardRef(({ lostTimeEntries }, ref) => {
     const chartRef = useRef(null);
 
     const processedData = useMemo(() => {
         const lostTimeByReason = lostTimeEntries.reduce((acc, entry) => {
-            const reason = entry.lostTimeReason || 'Unknown Reason';
+            const reason = sanitizeText(entry.lostTimeReason) || 'Unknown Reason';
             const duration = (entry.startTime && entry.endTime)
                 ? differenceInMinutes(entry.endTime, entry.startTime)
                 : 0;
@@ -24,8 +25,8 @@ const LostTimeReport = forwardRef(({ lostTimeEntries }, ref) => {
         const data = sortedReasons.map(([, duration]) => duration);
 
         const tableData = lostTimeEntries.map(entry => ({
-            reason: entry.lostTimeReason,
-            employee: entry.employeeName,
+            reason: sanitizeText(entry.lostTimeReason),
+            employee: sanitizeText(entry.employeeName),
             duration: (entry.startTime && entry.endTime) ? differenceInMinutes(entry.endTime, entry.startTime) : 0,
         }));
 

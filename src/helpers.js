@@ -31,3 +31,12 @@ export const loadScript = (src) => {
         document.head.appendChild(script);
     });
 };
+
+export const sanitizeText = (text) => {
+    if (typeof text !== 'string') {
+        return '';
+    }
+    // Allow alphanumeric, spaces, and some common punctuation.
+    // This will strip out characters often used in scripts or URLs like <, >, /, {, }, etc.
+    return text.replace(/[^a-zA-Z0-9 .,_'-]/g, '');
+};
