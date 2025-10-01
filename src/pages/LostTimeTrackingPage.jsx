@@ -31,6 +31,13 @@ const LostTimeTrackingPage = ({ user }) => {
     // Filter state
     const [filterStartDate, setFilterStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 7)));
     const [filterEndDate, setFilterEndDate] = useState(new Date());
+    const [activeFilterStartDate, setActiveFilterStartDate] = useState(filterStartDate);
+    const [activeFilterEndDate, setActiveFilterEndDate] = useState(filterEndDate);
+
+    const handleSearch = () => {
+        setActiveFilterStartDate(filterStartDate);
+        setActiveFilterEndDate(filterEndDate);
+    };
 
     const fetchLostTimeEntries = async () => {
         const entriesCollectionRef = query(collection(db, 'lostTimeEntries'), orderBy('createdAt', 'desc'));
@@ -64,20 +71,28 @@ const LostTimeTrackingPage = ({ user }) => {
         fetchLostTimeEntries();
     }, []);
 
-    const filteredEntries = useMemo(() => {
-        return lostTimeEntries.filter(entry => {
-            // Add a defensive check here
+    const groupedAndFilteredEntries = useMemo(() => {
+        const filtered = lostTimeEntries.filter(entry => {
             if (!entry.startDate) {
                 return false;
             }
             const entryDate = entry.startDate.toDate();
-            const startOfDay = new Date(filterStartDate);
+            const startOfDay = new Date(activeFilterStartDate);
             startOfDay.setHours(0, 0, 0, 0);
-            const endOfDay = new Date(filterEndDate);
+            const endOfDay = new Date(activeFilterEndDate);
             endOfDay.setHours(23, 59, 59, 999);
             return entryDate >= startOfDay && entryDate <= endOfDay;
         });
-    }, [lostTimeEntries, filterStartDate, filterEndDate]);
+
+        return filtered.reduce((acc, entry) => {
+            const section = entry.section || 'Uncategorized';
+            if (!acc[section]) {
+                acc[section] = [];
+            }
+            acc[section].push(entry);
+            return acc;
+        }, {});
+    }, [lostTimeEntries, activeFilterStartDate, activeFilterEndDate]);
 
     const handleExportPDF = () => {
         const doc = new jsPDF({
@@ -102,40 +117,56 @@ const LostTimeTrackingPage = ({ user }) => {
         doc.setFontSize(12);
         doc.text("Aqua Dynamics (Pvt) Ltd.", pageWidth / 2, 22, { align: 'center' });
 
-        // Define table columns as per new requirements
         const tableColumn = [
             "Ref. No", "Date", "Order number", "Qty", "employee number",
             "Lost Time Reason", "Start time", "end time", "Signature if responsible person"
         ];
-        const tableRows = [];
 
-        // Prepare table rows from filtered entries
-        filteredEntries.forEach((entry, index) => {
-            const entryData = [
-                index + 1, // Ref. No
-                entry.startDate ? format(entry.startDate.toDate(), 'yyyy-MM-dd') : '',
-                entry.orderNumber,
-                entry.orderQuantity,
-                entry.epfNumber,
-                entry.lostTimeReason,
-                entry.startTime ? format(entry.startTime.toDate(), 'HH:mm') : '',
-                entry.endTime ? format(entry.endTime.toDate(), 'HH:mm') : '',
-                '' // Blank for signature
-            ];
-            tableRows.push(entryData);
-        });
+        let startY = 35; // Initial Y position for the first table
 
-        // Add the table to the PDF
-        autoTable(doc, {
-            head: [tableColumn],
-            body: tableRows,
-            startY: 35,
-            theme: 'striped',
-            headStyles: { fillColor: [22, 160, 133] },
-            styles: { fontSize: 8 },
-            columnStyles: {
-                8: { cellWidth: 40 }, // Widen the signature column
+        Object.keys(groupedAndFilteredEntries).sort().forEach(section => {
+            const entries = groupedAndFilteredEntries[section];
+            if (entries.length === 0) return;
+
+            // Check if there's enough space for the section header and table header, otherwise add a new page
+            if (startY > pageHeight - 40) {
+                doc.addPage();
+                startY = 20;
             }
+
+            doc.setFontSize(14);
+            doc.text(section, 14, startY);
+            startY += 8;
+
+            const tableRows = [];
+            entries.forEach((entry, index) => {
+                const entryData = [
+                    index + 1, // Ref. No
+                    entry.startDate ? format(entry.startDate.toDate(), 'yyyy-MM-dd') : '',
+                    entry.orderNumber,
+                    entry.orderQuantity,
+                    entry.epfNumber,
+                    entry.lostTimeReason,
+                    entry.startTime ? format(entry.startTime.toDate(), 'HH:mm') : '',
+                    entry.endTime ? format(entry.endTime.toDate(), 'HH:mm') : '',
+                    '' // Blank for signature
+                ];
+                tableRows.push(entryData);
+            });
+
+            autoTable(doc, {
+                head: [tableColumn],
+                body: tableRows,
+                startY: startY,
+                theme: 'striped',
+                headStyles: { fillColor: [22, 160, 133] },
+                styles: { fontSize: 8 },
+                columnStyles: {
+                    8: { cellWidth: 40 }, // Widen the signature column
+                }
+            });
+
+            startY = doc.lastAutoTable.finalY + 10;
         });
 
         doc.save(`lost-time-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
@@ -271,59 +302,61 @@ const LostTimeTrackingPage = ({ user }) => {
                     <div className="d-flex align-items-center">
                         <DatePicker selected={filterStartDate} onChange={date => setFilterStartDate(date)} className="form-control form-control-sm me-2" />
                         <span className="me-2">to</span>
-                        <DatePicker selected={filterEndDate} onChange={date => setFilterEndDate(date)} className="form-control form-control-sm me-3" />
+                        <DatePicker selected={filterEndDate} onChange={date => setFilterEndDate(date)} className="form-control form-control-sm me-2" />
+                        <button className="btn btn-sm btn-primary me-3" onClick={handleSearch}>Search</button>
                         <button className="btn btn-sm btn-success" onClick={handleExportPDF}>Export PDF</button>
                     </div>
                 </div>
                 <div className="card-body">
-                    <div className="table-responsive">
-                        <table className="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Employee</th>
-                                    <th>Section</th>
-                                    <th>Lost Time Reason</th>
-                                    <th>Order #</th>
-                                    <th>Duration (mins)</th>
-                                    {user.role === 'super_admin' && <th>Actions</th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredEntries.map(entry => {
-                                    // Defensive checks for dates before calculating duration
-                                    if (!entry.startTime || !entry.endTime || !entry.startDate) {
-                                        // Optionally, render a placeholder or skip the row
-                                        return (
-                                            <tr key={entry.id}>
-                                                <td colSpan={user.role === 'super_admin' ? 7 : 6}>
-                                                    Invalid data for this entry.
-                                                </td>
-                                            </tr>
-                                        );
-                                    }
-                                    const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000; // duration in minutes
-                                    return (
-                                        <tr key={entry.id}>
-                                            <td>{format(entry.startDate.toDate(), 'yyyy-MM-dd')}</td>
-                                            <td>{entry.employeeName}</td>
-                                            <td>{entry.section}</td>
-                                            <td>{entry.lostTimeReason}</td>
-                                            <td>{entry.orderNumber}</td>
-                                            <td>{duration.toFixed(2)}</td>
-                                            {user.role === 'super_admin' && (
-                                                <td>
-                                                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>
-                                                        Delete
-                                                    </button>
-                                                </td>
-                                            )}
+                    {Object.keys(groupedAndFilteredEntries).sort().map(section => (
+                        <div key={section} className="mb-4">
+                            <h4 className="mb-3">{section}</h4>
+                            <div className="table-responsive">
+                                <table className="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Employee</th>
+                                            <th>Lost Time Reason</th>
+                                            <th>Order #</th>
+                                            <th>Duration (mins)</th>
+                                            {user.role === 'super_admin' && <th>Actions</th>}
                                         </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                                    </thead>
+                                    <tbody>
+                                        {groupedAndFilteredEntries[section].map(entry => {
+                                            if (!entry.startTime || !entry.endTime || !entry.startDate) {
+                                                return (
+                                                    <tr key={entry.id}>
+                                                        <td colSpan={user.role === 'super_admin' ? 6 : 5}>
+                                                            Invalid data for this entry.
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            }
+                                            const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000;
+                                            return (
+                                                <tr key={entry.id}>
+                                                    <td>{format(entry.startDate.toDate(), 'yyyy-MM-dd')}</td>
+                                                    <td>{entry.employeeName}</td>
+                                                    <td>{entry.lostTimeReason}</td>
+                                                    <td>{entry.orderNumber}</td>
+                                                    <td>{duration.toFixed(2)}</td>
+                                                    {user.role === 'super_admin' && (
+                                                        <td>
+                                                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>
+                                                                Delete
+                                                            </button>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </>
