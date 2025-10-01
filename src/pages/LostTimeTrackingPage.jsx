@@ -129,7 +129,7 @@ const LostTimeTrackingPage = ({ user }) => {
         doc.text("Daily Lost Time Recording Form - Yacht sail Department", pageWidth / 2, 15, { align: 'center' });
         doc.setFontSize(12);
         doc.text("Aqua Dynamics (Pvt) Ltd.", pageWidth / 2, 22, { align: 'center' });
-
+        
         // Filter entries for the PDF based on the current date picker values, not the active search
         const pdfFilteredEntries = lostTimeEntries.filter(entry => {
             if (!entry.startDate) {
@@ -343,8 +343,8 @@ const LostTimeTrackingPage = ({ user }) => {
                 <ul className="nav nav-tabs px-3 pt-3" id="lostTimeTab" role="tablist">
                     {['All', 'Sticking', 'Sewing', 'End Control'].map(tabName => (
                         <li className="nav-item" role="presentation" key={tabName}>
-                            <button
-                                className={`nav-link ${activeTab === tabName ? 'active' : ''}`}
+                            <button 
+                                className={`nav-link ${activeTab === tabName ? 'active' : ''}`} 
                                 onClick={() => setActiveTab(tabName)}
                             >
                                 {tabName}
@@ -405,15 +405,15 @@ const LostTimeTrackingPage = ({ user }) => {
                                 Page {currentPage} of {totalPages}
                             </span>
                             <div className="btn-group">
-                                <button
-                                    className="btn btn-outline-secondary"
+                                <button 
+                                    className="btn btn-outline-secondary" 
                                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                                     disabled={currentPage === 1}
                                 >
                                     Previous
                                 </button>
-                                <button
-                                    className="btn btn-outline-secondary"
+                                <button 
+                                    className="btn btn-outline-secondary" 
                                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                                     disabled={currentPage === totalPages}
                                 >
