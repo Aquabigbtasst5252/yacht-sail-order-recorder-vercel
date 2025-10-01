@@ -1,5 +1,5 @@
 // src/components/admin/breakdown/EmployeeManagement.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { db } from '../../../firebase';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
@@ -67,15 +67,19 @@ const EmployeeManagement = () => {
         setSection('Sticking');
     };
 
-    // Group employees by section
-    const groupedEmployees = employees.reduce((acc, employee) => {
-        const section = employee.section || 'Uncategorized';
-        if (!acc[section]) {
-            acc[section] = [];
+    const [activeTab, setActiveTab] = useState('All');
+
+    // Filter employees based on the active tab
+    const filteredEmployees = useMemo(() => {
+        const sortedEmployees = [...employees].sort((a, b) => a.name.localeCompare(b.name));
+        if (activeTab === 'All') {
+            return sortedEmployees;
         }
-        acc[section].push(employee);
-        return acc;
-    }, {});
+        if (activeTab === 'Uncategorized') {
+            return sortedEmployees.filter(employee => !employee.section || employee.section === 'Uncategorized');
+        }
+        return sortedEmployees.filter(employee => employee.section === activeTab);
+    }, [employees, activeTab]);
 
     return (
         <div>
@@ -125,36 +129,47 @@ const EmployeeManagement = () => {
                 )}
             </form>
 
-            {Object.entries(groupedEmployees).map(([section, sectionEmployees]) => (
-                <div key={section} className="mb-4">
-                    <h4 className="border-bottom pb-2 mb-3">{section}</h4>
-                    <table className="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Number</th>
-                                <th>Actions</th>
+            <ul className="nav nav-tabs mb-3">
+                {['All', 'Sticking', 'Sewing', 'End Control', 'Uncategorized'].map(tabName => (
+                    <li className="nav-item" key={tabName}>
+                        <button
+                            className={`nav-link ${activeTab === tabName ? 'active' : ''}`}
+                            onClick={() => setActiveTab(tabName)}
+                        >
+                            {tabName}
+                        </button>
+                    </li>
+                ))}
+            </ul>
+            <div className="table-responsive">
+                <table className="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Number</th>
+                            {activeTab === 'All' && <th>Section</th>}
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredEmployees.map((employee) => (
+                            <tr key={employee.id}>
+                                <td>{employee.name}</td>
+                                <td>{employee.number}</td>
+                                {activeTab === 'All' && <td>{employee.section || 'Uncategorized'}</td>}
+                                <td>
+                                    <button className="btn btn-sm btn-warning me-2" onClick={() => handleEdit(employee)}>
+                                        Edit
+                                    </button>
+                                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(employee.id)}>
+                                        Delete
+                                    </button>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {sectionEmployees.map((employee) => (
-                                <tr key={employee.id}>
-                                    <td>{employee.name}</td>
-                                    <td>{employee.number}</td>
-                                    <td>
-                                        <button className="btn btn-sm btn-warning me-2" onClick={() => handleEdit(employee)}>
-                                            Edit
-                                        </button>
-                                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(employee.id)}>
-                                            Delete
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            ))}
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 };
