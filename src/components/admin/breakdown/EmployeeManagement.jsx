@@ -1,5 +1,5 @@
 // src/components/admin/breakdown/EmployeeManagement.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../../../firebase';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
@@ -13,14 +13,14 @@ const EmployeeManagement = () => {
 
     const employeesCollectionRef = collection(db, 'employees');
 
-    const fetchEmployees = async () => {
+    const fetchEmployees = useCallback(async () => {
         const data = await getDocs(employeesCollectionRef);
         setEmployees(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
-    };
+    }, [employeesCollectionRef]);
 
     useEffect(() => {
         fetchEmployees();
-    }, []);
+    }, [fetchEmployees]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -66,6 +66,16 @@ const EmployeeManagement = () => {
         setEmployeeNumber('');
         setSection('Sticking');
     };
+
+    // Group employees by section
+    const groupedEmployees = employees.reduce((acc, employee) => {
+        const section = employee.section || 'Uncategorized';
+        if (!acc[section]) {
+            acc[section] = [];
+        }
+        acc[section].push(employee);
+        return acc;
+    }, {});
 
     return (
         <div>
@@ -115,33 +125,36 @@ const EmployeeManagement = () => {
                 )}
             </form>
 
-            <table className="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Number</th>
-                        <th>Section</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {employees.map((employee) => (
-                        <tr key={employee.id}>
-                            <td>{employee.name}</td>
-                            <td>{employee.number}</td>
-                            <td>{employee.section}</td>
-                            <td>
-                                <button className="btn btn-sm btn-warning me-2" onClick={() => handleEdit(employee)}>
-                                    Edit
-                                </button>
-                                <button className="btn btn-sm btn-danger" onClick={() => handleDelete(employee.id)}>
-                                    Delete
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+            {Object.entries(groupedEmployees).map(([section, sectionEmployees]) => (
+                <div key={section} className="mb-4">
+                    <h4 className="border-bottom pb-2 mb-3">{section}</h4>
+                    <table className="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Number</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sectionEmployees.map((employee) => (
+                                <tr key={employee.id}>
+                                    <td>{employee.name}</td>
+                                    <td>{employee.number}</td>
+                                    <td>
+                                        <button className="btn btn-sm btn-warning me-2" onClick={() => handleEdit(employee)}>
+                                            Edit
+                                        </button>
+                                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(employee.id)}>
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            ))}
         </div>
     );
 };
