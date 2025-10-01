@@ -66,6 +66,10 @@ const LostTimeTrackingPage = ({ user }) => {
 
     const filteredEntries = useMemo(() => {
         return lostTimeEntries.filter(entry => {
+            // Add a defensive check here
+            if (!entry.startDate) {
+                return false;
+            }
             const entryDate = entry.startDate.toDate();
             const startOfDay = new Date(filterStartDate);
             startOfDay.setHours(0, 0, 0, 0);
@@ -287,6 +291,17 @@ const LostTimeTrackingPage = ({ user }) => {
                             </thead>
                             <tbody>
                                 {filteredEntries.map(entry => {
+                                    // Defensive checks for dates before calculating duration
+                                    if (!entry.startTime || !entry.endTime || !entry.startDate) {
+                                        // Optionally, render a placeholder or skip the row
+                                        return (
+                                            <tr key={entry.id}>
+                                                <td colSpan={user.role === 'super_admin' ? 7 : 6}>
+                                                    Invalid data for this entry.
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
                                     const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000; // duration in minutes
                                     return (
                                         <tr key={entry.id}>
