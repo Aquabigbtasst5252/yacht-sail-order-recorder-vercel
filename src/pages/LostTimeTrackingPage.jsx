@@ -33,11 +33,19 @@ const LostTimeTrackingPage = ({ user }) => {
     const [filterEndDate, setFilterEndDate] = useState(new Date());
     const [activeFilterStartDate, setActiveFilterStartDate] = useState(filterStartDate);
     const [activeFilterEndDate, setActiveFilterEndDate] = useState(filterEndDate);
+    const [activeTab, setActiveTab] = useState('All');
+    const [currentPage, setCurrentPage] = useState(1);
+    const entriesPerPage = 20;
 
     const handleSearch = () => {
         setActiveFilterStartDate(filterStartDate);
         setActiveFilterEndDate(filterEndDate);
+        setCurrentPage(1); // Reset to first page on new search
     };
+
+    useEffect(() => {
+        setCurrentPage(1); // Reset to first page when tab changes
+    }, [activeTab]);
 
     const fetchLostTimeEntries = async () => {
         const entriesCollectionRef = query(collection(db, 'lostTimeEntries'), orderBy('createdAt', 'desc'));
@@ -71,8 +79,8 @@ const LostTimeTrackingPage = ({ user }) => {
         fetchLostTimeEntries();
     }, []);
 
-    const groupedAndFilteredEntries = useMemo(() => {
-        const filtered = lostTimeEntries.filter(entry => {
+    const dateFilteredEntries = useMemo(() => {
+        return lostTimeEntries.filter(entry => {
             if (!entry.startDate) {
                 return false;
             }
@@ -83,16 +91,21 @@ const LostTimeTrackingPage = ({ user }) => {
             endOfDay.setHours(23, 59, 59, 999);
             return entryDate >= startOfDay && entryDate <= endOfDay;
         });
-
-        return filtered.reduce((acc, entry) => {
-            const section = entry.section || 'Uncategorized';
-            if (!acc[section]) {
-                acc[section] = [];
-            }
-            acc[section].push(entry);
-            return acc;
-        }, {});
     }, [lostTimeEntries, activeFilterStartDate, activeFilterEndDate]);
+
+    const tabFilteredEntries = useMemo(() => {
+        if (activeTab === 'All') {
+            return dateFilteredEntries;
+        }
+        return dateFilteredEntries.filter(entry => entry.section === activeTab);
+    }, [dateFilteredEntries, activeTab]);
+
+    const totalPages = Math.ceil(tabFilteredEntries.length / entriesPerPage);
+    const paginatedEntries = useMemo(() => {
+        const startIndex = (currentPage - 1) * entriesPerPage;
+        const endIndex = startIndex + entriesPerPage;
+        return tabFilteredEntries.slice(startIndex, endIndex);
+    }, [tabFilteredEntries, currentPage]);
 
     const handleExportPDF = () => {
         const doc = new jsPDF({
@@ -116,6 +129,29 @@ const LostTimeTrackingPage = ({ user }) => {
         doc.text("Daily Lost Time Recording Form - Yacht sail Department", pageWidth / 2, 15, { align: 'center' });
         doc.setFontSize(12);
         doc.text("Aqua Dynamics (Pvt) Ltd.", pageWidth / 2, 22, { align: 'center' });
+        
+        // Filter entries for the PDF based on the current date picker values, not the active search
+        const pdfFilteredEntries = lostTimeEntries.filter(entry => {
+            if (!entry.startDate) {
+                return false;
+            }
+            const entryDate = entry.startDate.toDate();
+            const startOfDay = new Date(filterStartDate); // Use staging filter
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(filterEndDate); // Use staging filter
+            endOfDay.setHours(23, 59, 59, 999);
+            return entryDate >= startOfDay && entryDate <= endOfDay;
+        });
+
+        // Group all date-filtered entries by section for the PDF
+        const groupedForPdf = pdfFilteredEntries.reduce((acc, entry) => {
+            const section = entry.section || 'Uncategorized';
+            if (!acc[section]) {
+                acc[section] = [];
+            }
+            acc[section].push(entry);
+            return acc;
+        }, {});
 
         const tableColumn = [
             "Ref. No", "Date", "Order number", "Qty", "employee number",
@@ -124,12 +160,11 @@ const LostTimeTrackingPage = ({ user }) => {
 
         let startY = 35; // Initial Y position for the first table
 
-        Object.keys(groupedAndFilteredEntries).sort().forEach(section => {
-            const entries = groupedAndFilteredEntries[section];
+        Object.keys(groupedForPdf).sort().forEach(section => {
+            const entries = groupedForPdf[section];
             if (entries.length === 0) return;
 
-            // Check if there's enough space for the section header and table header, otherwise add a new page
-            if (startY > pageHeight - 40) {
+            if (startY > pageHeight - 40) { // Check for space
                 doc.addPage();
                 startY = 20;
             }
@@ -141,7 +176,7 @@ const LostTimeTrackingPage = ({ user }) => {
             const tableRows = [];
             entries.forEach((entry, index) => {
                 const entryData = [
-                    index + 1, // Ref. No
+                    index + 1,
                     entry.startDate ? format(entry.startDate.toDate(), 'yyyy-MM-dd') : '',
                     entry.orderNumber,
                     entry.orderQuantity,
@@ -149,7 +184,7 @@ const LostTimeTrackingPage = ({ user }) => {
                     entry.lostTimeReason,
                     entry.startTime ? format(entry.startTime.toDate(), 'HH:mm') : '',
                     entry.endTime ? format(entry.endTime.toDate(), 'HH:mm') : '',
-                    '' // Blank for signature
+                    ''
                 ];
                 tableRows.push(entryData);
             });
@@ -161,9 +196,7 @@ const LostTimeTrackingPage = ({ user }) => {
                 theme: 'striped',
                 headStyles: { fillColor: [22, 160, 133] },
                 styles: { fontSize: 8 },
-                columnStyles: {
-                    8: { cellWidth: 40 }, // Widen the signature column
-                }
+                columnStyles: { 8: { cellWidth: 40 } }
             });
 
             startY = doc.lastAutoTable.finalY + 10;
@@ -307,56 +340,88 @@ const LostTimeTrackingPage = ({ user }) => {
                         <button className="btn btn-sm btn-success" onClick={handleExportPDF}>Export PDF</button>
                     </div>
                 </div>
+                <ul className="nav nav-tabs px-3 pt-3" id="lostTimeTab" role="tablist">
+                    {['All', 'Sticking', 'Sewing', 'End Control'].map(tabName => (
+                        <li className="nav-item" role="presentation" key={tabName}>
+                            <button 
+                                className={`nav-link ${activeTab === tabName ? 'active' : ''}`} 
+                                onClick={() => setActiveTab(tabName)}
+                            >
+                                {tabName}
+                            </button>
+                        </li>
+                    ))}
+                </ul>
                 <div className="card-body">
-                    {Object.keys(groupedAndFilteredEntries).sort().map(section => (
-                        <div key={section} className="mb-4">
-                            <h4 className="mb-3">{section}</h4>
-                            <div className="table-responsive">
-                                <table className="table table-striped table-bordered">
-                                    <thead>
-                                        <tr>
-                                            <th>Date</th>
-                                            <th>Employee</th>
-                                            <th>Lost Time Reason</th>
-                                            <th>Order #</th>
-                                            <th>Duration (mins)</th>
-                                            {user.role === 'super_admin' && <th>Actions</th>}
+                    <div className="table-responsive">
+                        <table className="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Employee</th>
+                                    <th>Section</th>
+                                    <th>Lost Time Reason</th>
+                                    <th>Order #</th>
+                                    <th>Duration (mins)</th>
+                                    {user.role === 'super_admin' && <th>Actions</th>}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedEntries.map(entry => {
+                                    if (!entry.startTime || !entry.endTime || !entry.startDate) {
+                                        return (
+                                            <tr key={entry.id}>
+                                                <td colSpan={user.role === 'super_admin' ? 7 : 6}>
+                                                    Invalid data for this entry.
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
+                                    const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000;
+                                    return (
+                                        <tr key={entry.id}>
+                                            <td>{format(entry.startDate.toDate(), 'yyyy-MM-dd')}</td>
+                                            <td>{entry.employeeName}</td>
+                                            <td>{entry.section}</td>
+                                            <td>{entry.lostTimeReason}</td>
+                                            <td>{entry.orderNumber}</td>
+                                            <td>{duration.toFixed(2)}</td>
+                                            {user.role === 'super_admin' && (
+                                                <td>
+                                                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>
+                                                        Delete
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        {groupedAndFilteredEntries[section].map(entry => {
-                                            if (!entry.startTime || !entry.endTime || !entry.startDate) {
-                                                return (
-                                                    <tr key={entry.id}>
-                                                        <td colSpan={user.role === 'super_admin' ? 6 : 5}>
-                                                            Invalid data for this entry.
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            }
-                                            const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000;
-                                            return (
-                                                <tr key={entry.id}>
-                                                    <td>{format(entry.startDate.toDate(), 'yyyy-MM-dd')}</td>
-                                                    <td>{entry.employeeName}</td>
-                                                    <td>{entry.lostTimeReason}</td>
-                                                    <td>{entry.orderNumber}</td>
-                                                    <td>{duration.toFixed(2)}</td>
-                                                    {user.role === 'super_admin' && (
-                                                        <td>
-                                                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>
-                                                                Delete
-                                                            </button>
-                                                        </td>
-                                                    )}
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    {totalPages > 1 && (
+                        <div className="d-flex justify-content-end align-items-center mt-3">
+                            <span className="me-3">
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <div className="btn-group">
+                                <button 
+                                    className="btn btn-outline-secondary" 
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    Previous
+                                </button>
+                                <button 
+                                    className="btn btn-outline-secondary" 
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    Next
+                                </button>
                             </div>
                         </div>
-                    ))}
+                    )}
                 </div>
             </div>
         </>
