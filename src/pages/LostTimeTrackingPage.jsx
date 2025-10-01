@@ -113,13 +113,13 @@ const LostTimeTrackingPage = ({ user }) => {
         filteredEntries.forEach((entry, index) => {
             const entryData = [
                 index + 1, // Ref. No
-                format(entry.startDate.toDate(), 'yyyy-MM-dd'),
+                entry.startDate ? format(entry.startDate.toDate(), 'yyyy-MM-dd') : '',
                 entry.orderNumber,
                 entry.orderQuantity,
                 entry.epfNumber,
                 entry.lostTimeReason,
-                format(entry.startTime.toDate(), 'HH:mm'),
-                format(entry.endTime.toDate(), 'HH:mm'),
+                entry.startTime ? format(entry.startTime.toDate(), 'HH:mm') : '',
+                entry.endTime ? format(entry.endTime.toDate(), 'HH:mm') : '',
                 '' // Blank for signature
             ];
             tableRows.push(entryData);
