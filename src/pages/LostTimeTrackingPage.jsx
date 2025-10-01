@@ -31,6 +31,21 @@ const LostTimeTrackingPage = ({ user }) => {
     // Filter state
     const [filterStartDate, setFilterStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 7)));
     const [filterEndDate, setFilterEndDate] = useState(new Date());
+    const [activeFilterStartDate, setActiveFilterStartDate] = useState(filterStartDate);
+    const [activeFilterEndDate, setActiveFilterEndDate] = useState(filterEndDate);
+    const [activeTab, setActiveTab] = useState('All');
+    const [currentPage, setCurrentPage] = useState(1);
+    const entriesPerPage = 20;
+
+    const handleSearch = () => {
+        setActiveFilterStartDate(filterStartDate);
+        setActiveFilterEndDate(filterEndDate);
+        setCurrentPage(1); // Reset to first page on new search
+    };
+
+    useEffect(() => {
+        setCurrentPage(1); // Reset to first page when tab changes
+    }, [activeTab]);
 
     const fetchLostTimeEntries = async () => {
         const entriesCollectionRef = query(collection(db, 'lostTimeEntries'), orderBy('createdAt', 'desc'));
@@ -64,20 +79,33 @@ const LostTimeTrackingPage = ({ user }) => {
         fetchLostTimeEntries();
     }, []);
 
-    const filteredEntries = useMemo(() => {
+    const dateFilteredEntries = useMemo(() => {
         return lostTimeEntries.filter(entry => {
-            // Add a defensive check here
             if (!entry.startDate) {
                 return false;
             }
             const entryDate = entry.startDate.toDate();
-            const startOfDay = new Date(filterStartDate);
+            const startOfDay = new Date(activeFilterStartDate);
             startOfDay.setHours(0, 0, 0, 0);
-            const endOfDay = new Date(filterEndDate);
+            const endOfDay = new Date(activeFilterEndDate);
             endOfDay.setHours(23, 59, 59, 999);
             return entryDate >= startOfDay && entryDate <= endOfDay;
         });
-    }, [lostTimeEntries, filterStartDate, filterEndDate]);
+    }, [lostTimeEntries, activeFilterStartDate, activeFilterEndDate]);
+
+    const tabFilteredEntries = useMemo(() => {
+        if (activeTab === 'All') {
+            return dateFilteredEntries;
+        }
+        return dateFilteredEntries.filter(entry => entry.section === activeTab);
+    }, [dateFilteredEntries, activeTab]);
+
+    const totalPages = Math.ceil(tabFilteredEntries.length / entriesPerPage);
+    const paginatedEntries = useMemo(() => {
+        const startIndex = (currentPage - 1) * entriesPerPage;
+        const endIndex = startIndex + entriesPerPage;
+        return tabFilteredEntries.slice(startIndex, endIndex);
+    }, [tabFilteredEntries, currentPage]);
 
     const handleExportPDF = () => {
         const doc = new jsPDF({
@@ -102,40 +130,76 @@ const LostTimeTrackingPage = ({ user }) => {
         doc.setFontSize(12);
         doc.text("Aqua Dynamics (Pvt) Ltd.", pageWidth / 2, 22, { align: 'center' });
 
-        // Define table columns as per new requirements
+        // Filter entries for the PDF based on the current date picker values, not the active search
+        const pdfFilteredEntries = lostTimeEntries.filter(entry => {
+            if (!entry.startDate) {
+                return false;
+            }
+            const entryDate = entry.startDate.toDate();
+            const startOfDay = new Date(filterStartDate); // Use staging filter
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(filterEndDate); // Use staging filter
+            endOfDay.setHours(23, 59, 59, 999);
+            return entryDate >= startOfDay && entryDate <= endOfDay;
+        });
+
+        // Group all date-filtered entries by section for the PDF
+        const groupedForPdf = pdfFilteredEntries.reduce((acc, entry) => {
+            const section = entry.section || 'Uncategorized';
+            if (!acc[section]) {
+                acc[section] = [];
+            }
+            acc[section].push(entry);
+            return acc;
+        }, {});
+
         const tableColumn = [
             "Ref. No", "Date", "Order number", "Qty", "employee number",
             "Lost Time Reason", "Start time", "end time", "Signature if responsible person"
         ];
-        const tableRows = [];
 
-        // Prepare table rows from filtered entries
-        filteredEntries.forEach((entry, index) => {
-            const entryData = [
-                index + 1, // Ref. No
-                format(entry.startDate.toDate(), 'yyyy-MM-dd'),
-                entry.orderNumber,
-                entry.orderQuantity,
-                entry.epfNumber,
-                entry.lostTimeReason,
-                format(entry.startTime.toDate(), 'HH:mm'),
-                format(entry.endTime.toDate(), 'HH:mm'),
-                '' // Blank for signature
-            ];
-            tableRows.push(entryData);
-        });
+        let startY = 35; // Initial Y position for the first table
 
-        // Add the table to the PDF
-        autoTable(doc, {
-            head: [tableColumn],
-            body: tableRows,
-            startY: 35,
-            theme: 'striped',
-            headStyles: { fillColor: [22, 160, 133] },
-            styles: { fontSize: 8 },
-            columnStyles: {
-                8: { cellWidth: 40 }, // Widen the signature column
+        Object.keys(groupedForPdf).sort().forEach(section => {
+            const entries = groupedForPdf[section];
+            if (entries.length === 0) return;
+
+            if (startY > pageHeight - 40) { // Check for space
+                doc.addPage();
+                startY = 20;
             }
+
+            doc.setFontSize(14);
+            doc.text(section, 14, startY);
+            startY += 8;
+
+            const tableRows = [];
+            entries.forEach((entry, index) => {
+                const entryData = [
+                    index + 1,
+                    entry.startDate ? format(entry.startDate.toDate(), 'yyyy-MM-dd') : '',
+                    entry.orderNumber,
+                    entry.orderQuantity,
+                    entry.epfNumber,
+                    entry.lostTimeReason,
+                    entry.startTime ? format(entry.startTime.toDate(), 'HH:mm') : '',
+                    entry.endTime ? format(entry.endTime.toDate(), 'HH:mm') : '',
+                    ''
+                ];
+                tableRows.push(entryData);
+            });
+
+            autoTable(doc, {
+                head: [tableColumn],
+                body: tableRows,
+                startY: startY,
+                theme: 'striped',
+                headStyles: { fillColor: [22, 160, 133] },
+                styles: { fontSize: 8 },
+                columnStyles: { 8: { cellWidth: 40 } }
+            });
+
+            startY = doc.lastAutoTable.finalY + 10;
         });
 
         doc.save(`lost-time-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
@@ -271,13 +335,26 @@ const LostTimeTrackingPage = ({ user }) => {
                     <div className="d-flex align-items-center">
                         <DatePicker selected={filterStartDate} onChange={date => setFilterStartDate(date)} className="form-control form-control-sm me-2" />
                         <span className="me-2">to</span>
-                        <DatePicker selected={filterEndDate} onChange={date => setFilterEndDate(date)} className="form-control form-control-sm me-3" />
+                        <DatePicker selected={filterEndDate} onChange={date => setFilterEndDate(date)} className="form-control form-control-sm me-2" />
+                        <button className="btn btn-sm btn-primary me-3" onClick={handleSearch}>Search</button>
                         <button className="btn btn-sm btn-success" onClick={handleExportPDF}>Export PDF</button>
                     </div>
                 </div>
+                <ul className="nav nav-tabs px-3 pt-3" id="lostTimeTab" role="tablist">
+                    {['All', 'Sticking', 'Sewing', 'End Control'].map(tabName => (
+                        <li className="nav-item" role="presentation" key={tabName}>
+                            <button
+                                className={`nav-link ${activeTab === tabName ? 'active' : ''}`}
+                                onClick={() => setActiveTab(tabName)}
+                            >
+                                {tabName}
+                            </button>
+                        </li>
+                    ))}
+                </ul>
                 <div className="card-body">
                     <div className="table-responsive">
-                        <table className="table table-striped">
+                        <table className="table table-striped table-bordered">
                             <thead>
                                 <tr>
                                     <th>Date</th>
@@ -290,10 +367,8 @@ const LostTimeTrackingPage = ({ user }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredEntries.map(entry => {
-                                    // Defensive checks for dates before calculating duration
+                                {paginatedEntries.map(entry => {
                                     if (!entry.startTime || !entry.endTime || !entry.startDate) {
-                                        // Optionally, render a placeholder or skip the row
                                         return (
                                             <tr key={entry.id}>
                                                 <td colSpan={user.role === 'super_admin' ? 7 : 6}>
@@ -302,7 +377,7 @@ const LostTimeTrackingPage = ({ user }) => {
                                             </tr>
                                         );
                                     }
-                                    const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000; // duration in minutes
+                                    const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000;
                                     return (
                                         <tr key={entry.id}>
                                             <td>{format(entry.startDate.toDate(), 'yyyy-MM-dd')}</td>
@@ -324,6 +399,29 @@ const LostTimeTrackingPage = ({ user }) => {
                             </tbody>
                         </table>
                     </div>
+                    {totalPages > 1 && (
+                        <div className="d-flex justify-content-end align-items-center mt-3">
+                            <span className="me-3">
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <div className="btn-group">
+                                <button
+                                    className="btn btn-outline-secondary"
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    Previous
+                                </button>
+                                <button
+                                    className="btn btn-outline-secondary"
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </>
