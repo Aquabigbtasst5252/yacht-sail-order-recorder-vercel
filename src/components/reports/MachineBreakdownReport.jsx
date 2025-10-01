@@ -2,6 +2,7 @@
 import React, { useMemo, forwardRef, useRef, useImperativeHandle } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { differenceInMinutes } from 'date-fns';
+import { sanitizeText } from '../../helpers';
 
 const MachineBreakdownReport = forwardRef(({ breakdowns }, ref) => {
     const chartRef = useRef(null);
@@ -21,7 +22,7 @@ const MachineBreakdownReport = forwardRef(({ breakdowns }, ref) => {
 
         const tableData = breakdowns.map(b => ({
             machine: b.machineName,
-            reason: b.reasonText,
+            reason: sanitizeText(b.reasonText),
             duration: (b.startTime && b.endTime) ? differenceInMinutes(b.endTime, b.startTime) : 0,
         }));
 
