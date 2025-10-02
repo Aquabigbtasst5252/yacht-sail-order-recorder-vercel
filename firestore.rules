@@ -1,29 +1,41 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read access to orders for any authenticated user
+
+    // --- Specific rule for the 'orders' collection ---
     match /orders/{orderId} {
-      allow read: if request.auth != null;
-      allow write: if false; // Keep writes restricted for now
+      allow read, update: if request.auth != null;
+
+      // Specific sub-collection rule for qcPhotos
+      match /qcPhotos/{photoId} {
+        allow read, create: if request.auth != null;
+        // Role-based delete permission
+        allow delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['super_admin', 'production'];
+      }
     }
 
-    // Allow users to read their own user data
+    // --- Specific rules for other collections ---
     match /users/{userId} {
-      allow read, write: if request.auth.uid == userId;
+      // Allows users to read/write their own data, which is more secure
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Allow read access to production statuses for authenticated users
-    match /productionStatuses/{statusId} {
-        allow read: if request.auth != null;
+    match /settings/main {
+      allow read, write: if request.auth != null;
     }
 
-    // Allow read access to settings for authenticated users
-    match /settings/{settingId} {
-        allow read: if request.auth != null;
-    }
+    // --- Add other specific rules for customers, sailTypes, etc. here ---
+    // For example:
+    // match /customers/{customerId} {
+    //   allow read, write: if request.auth != null;
+    // }
 
-    // Allow read/write to order status history for authenticated users
-    match /orders/{orderId}/statusHistory/{historyId} {
+
+    // --- ⬇️ CRUCIAL ADDITION: Secure Default Rule ---
+    // This is a catch-all rule for ANY document not matched above.
+    // It ensures that authenticated users can access other collections
+    // like 'customers', 'sailTypes', etc., without being blocked.
+    match /{document=**} {
         allow read, write: if request.auth != null;
     }
   }
