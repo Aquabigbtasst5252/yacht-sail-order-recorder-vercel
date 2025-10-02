@@ -6,8 +6,8 @@ import { collection, query, onSnapshot, orderBy, limit } from "firebase/firestor
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from 'date-fns';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import ComprehensivePDF from '../components/reports/ComprehensivePDF';
 
 // Import all report components
 import SalesByCustomerSails from '../components/reports/SalesByCustomerSails';
@@ -31,38 +31,32 @@ const ComprehensiveReport = () => {
 
     const [loading, setLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
+    const [pdfData, setPdfData] = useState(null);
     const [activeTab, setActiveTab] = useState('salesByCustomerSails');
 
     const reportRefs = useRef({});
 
     useEffect(() => {
         setLoading(true);
-
-        // Fetch the most recent 1000 records to balance performance and data availability
         const ordersQuery = query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(1000));
         const unsubOrders = onSnapshot(ordersQuery, (snap) => {
-            const data = snap.docs.map(d => ({
-                id: d.id, ...d.data(),
-                // Use createdAt for filtering, but keep orderDate for any other logic
-                orderDate: d.data().orderDate?.toDate(),
-                createdAt: d.data().createdAt?.toDate()
-            }));
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), orderDate: d.data().orderDate?.toDate(), createdAt: d.data().createdAt?.toDate() }));
             setAllOrders(data);
-        }, (err) => console.error("Error fetching orders:", err));
+        });
 
         const breakdownsQuery = query(collection(db, "machineBreakdowns"), orderBy("createdAt", "desc"), limit(1000));
         const unsubBreakdowns = onSnapshot(breakdownsQuery, (snap) => {
             const data = snap.docs.map(d => ({ id: d.id, ...d.data(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() }));
             setMachineBreakdowns(data);
-        }, (err) => console.error("Error fetching machine breakdowns:", err));
+        });
 
         const lostTimeQuery = query(collection(db, "lostTimeEntries"), orderBy("createdAt", "desc"), limit(1000));
         const unsubLostTime = onSnapshot(lostTimeQuery, (snap) => {
             const data = snap.docs.map(d => ({ id: d.id, ...d.data(), startDate: d.data().startDate?.toDate(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() }));
             setLostTimeEntries(data);
-        }, (err) => console.error("Error fetching lost time entries:", err));
+        });
 
-        const timer = setTimeout(() => setLoading(false), 2500); // Allow time for all queries
+        const timer = setTimeout(() => setLoading(false), 2500);
 
         return () => {
             unsubOrders();
@@ -74,19 +68,14 @@ const ComprehensiveReport = () => {
 
     const dateRangeFilter = (items, dateField) => {
         if (!startDate || !endDate) return items;
-
         const start = new Date(startDate);
         start.setHours(0, 0, 0, 0);
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
 
         return items.filter(item => {
-            // Use the specified date field for filtering. Fallback to createdAt for orders if needed.
             let itemDate = item[dateField];
-            if (dateField === 'orderDate' && !itemDate) {
-                itemDate = item.createdAt;
-            }
-
+            if (dateField === 'orderDate' && !itemDate) itemDate = item.createdAt;
             if (itemDate && typeof itemDate.getTime === 'function' && !isNaN(itemDate.getTime())) {
                 return itemDate >= start && itemDate <= end;
             }
@@ -97,90 +86,6 @@ const ComprehensiveReport = () => {
     const filteredOrders = useMemo(() => dateRangeFilter(allOrders, 'orderDate'), [startDate, endDate, allOrders]);
     const filteredBreakdowns = useMemo(() => dateRangeFilter(machineBreakdowns, 'startTime'), [startDate, endDate, machineBreakdowns]);
     const filteredLostTime = useMemo(() => dateRangeFilter(lostTimeEntries, 'startDate'), [startDate, endDate, lostTimeEntries]);
-
-
-    const handleExportPDF = async () => {
-        // 1. Set exporting state and use flushSync to force immediate re-render
-        flushSync(() => {
-            setIsExporting(true);
-        });
-
-        // 2. Generate the PDF
-        const doc = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const margin = 10;
-        let yPos = margin;
-
-        // Pre-load the logo
-        const logoImg = new Image();
-        logoImg.src = '/logo.png';
-
-        try {
-            await new Promise((resolve, reject) => {
-                logoImg.onload = resolve;
-                logoImg.onerror = reject;
-            });
-
-            doc.addImage(logoImg, 'PNG', margin, yPos, 13, 11);
-            doc.setFontSize(18);
-            doc.text("Comprehensive Report", pageWidth / 2, yPos + 5, { align: 'center' });
-            doc.setFontSize(12);
-            doc.text("Yacht Sails Department", pageWidth / 2, yPos + 12, { align: 'center' });
-            yPos += 20;
-
-            doc.setFontSize(10);
-            const dateRangeStr = `Date Range: ${format(startDate, 'yyyy-MM-dd')} to ${format(endDate, 'yyyy-MM-dd')}`;
-            doc.text(dateRangeStr, margin, yPos);
-            yPos += 10;
-
-            for (const { key } of reportComponents) {
-                const report = reportRefs.current[key];
-                if (!report || !report.chart || !report.tableData || report.tableData.length === 0) continue;
-
-                const { title, tableData, headers, chart } = report;
-
-                if (yPos + 100 > pageHeight - margin) { // Approximate height for chart + table
-                    doc.addPage();
-                    yPos = margin;
-                }
-
-                doc.setFontSize(14);
-                doc.text(title, margin, yPos);
-                yPos += 8;
-
-                try {
-                    const chartImage = chart.toBase64Image();
-                    doc.addImage(chartImage, 'PNG', margin, yPos, pageWidth - (margin * 2), 80);
-                    yPos += 90;
-
-                    doc.autoTable({
-                        head: [headers],
-                        body: tableData,
-                        startY: yPos,
-                        theme: 'striped',
-                        headStyles: { fillColor: [22, 160, 133] },
-                        margin: { left: margin, right: margin }
-                    });
-                    yPos = doc.autoTable.previous.finalY + 10;
-                } catch (error) {
-                    console.error(`Failed to process report section "${title}":`, error);
-                    yPos += 10; // Add space to avoid overlap
-                }
-            }
-
-            doc.save(`comprehensive-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-
-        } catch (error) {
-            console.error("Failed to load logo, PDF generation aborted.", error);
-            alert("Error loading assets for PDF. Please try again.");
-        } finally {
-            // 3. Reset the exporting state
-            flushSync(() => {
-                setIsExporting(false);
-            });
-        }
-    };
 
     const reportComponents = useMemo(() => [
         { key: 'salesByCustomerSails', label: 'Sales by Customer (Sails)', Component: SalesByCustomerSails, props: { orders: filteredOrders } },
@@ -195,14 +100,61 @@ const ComprehensiveReport = () => {
         { key: 'lostTime', label: 'Lost Time', Component: LostTimeReport, props: { lostTimeEntries: filteredLostTime } },
     ], [filteredOrders, filteredBreakdowns, filteredLostTime]);
 
+    const handlePrepareExport = () => {
+        flushSync(() => {
+            setIsExporting(true);
+        });
+
+        const dataForPdf = reportComponents.map(({ key }) => {
+            const report = reportRefs.current[key];
+            if (!report) return null;
+            return {
+                key,
+                title: report.title,
+                chart: report.chart,
+                headers: report.headers,
+                tableData: report.tableData
+            };
+        }).filter(Boolean);
+
+        setPdfData(dataForPdf);
+    };
+
+    useEffect(() => {
+        if (pdfData) {
+            const downloadLink = document.getElementById('pdf-download-link');
+            if (downloadLink) {
+                downloadLink.click();
+            }
+            setIsExporting(false);
+            setPdfData(null);
+        }
+    }, [pdfData]);
+
     return (
         <div className="container-fluid">
             <div className="card">
                 <div className="card-header d-flex justify-content-between align-items-center">
                     <h2 className="h4 mb-0">Comprehensive Report</h2>
-                    <button className="btn btn-sm btn-success" onClick={handleExportPDF} disabled={loading || isExporting}>
-                        {isExporting ? 'Exporting...' : 'Export as PDF'}
-                    </button>
+                    <div>
+                        <button
+                            className="btn btn-sm btn-success"
+                            onClick={handlePrepareExport}
+                            disabled={loading || isExporting}
+                        >
+                            {isExporting ? 'Preparing...' : 'Export as PDF'}
+                        </button>
+                        {pdfData && (
+                            <PDFDownloadLink
+                                document={<ComprehensivePDF reportData={pdfData} startDate={startDate} endDate={endDate} />}
+                                fileName={`comprehensive-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`}
+                                id="pdf-download-link"
+                                style={{ display: 'none' }}
+                            >
+                                {({ blob, url, loading, error }) => (loading ? 'Loading document...' : 'Download')}
+                            </PDFDownloadLink>
+                        )}
+                    </div>
                 </div>
                 <div className="card-body">
                     <div className="row mb-4 align-items-end">
@@ -220,10 +172,10 @@ const ComprehensiveReport = () => {
                         <div className="text-center py-5"><div className="spinner-border" role="status"><span className="visually-hidden">Loading...</span></div></div>
                     ) : (
                         <div>
-                            {isExporting && (
-                                <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+                            {(isExporting) && (
+                                <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', zIndex: -1 }}>
                                     {reportComponents.map(({ key, Component, props }) => (
-                                        <div key={key} style={{ width: '800px', height: '600px' }}>
+                                        <div key={`export-${key}`} style={{ width: '800px', height: 'auto' }}>
                                             <Component {...props} ref={el => (reportRefs.current[key] = el)} />
                                         </div>
                                     ))}
