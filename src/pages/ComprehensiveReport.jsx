@@ -1,5 +1,6 @@
 // src/pages/ComprehensiveReport.jsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { db } from '../firebase';
 import { collection, query, onSnapshot, orderBy, limit } from "firebase/firestore";
 import DatePicker from 'react-datepicker';
@@ -98,18 +99,30 @@ const ComprehensiveReport = () => {
     const filteredLostTime = useMemo(() => dateRangeFilter(lostTimeEntries, 'startDate'), [startDate, endDate, lostTimeEntries]);
 
 
-    const handleExportPDF = () => {
-        setIsExporting(true);
+    const handleExportPDF = async () => {
+        // 1. Set exporting state and use flushSync to force immediate re-render
+        flushSync(() => {
+            setIsExporting(true);
+        });
 
-        setTimeout(() => {
-            const doc = new jsPDF('p', 'mm', 'a4');
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
-            const margin = 10;
-            let yPos = margin;
+        // 2. Generate the PDF
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 10;
+        let yPos = margin;
 
-            const logo = '/logo.png';
-            doc.addImage(logo, 'PNG', margin, yPos, 13, 11);
+        // Pre-load the logo
+        const logoImg = new Image();
+        logoImg.src = '/logo.png';
+
+        try {
+            await new Promise((resolve, reject) => {
+                logoImg.onload = resolve;
+                logoImg.onerror = reject;
+            });
+
+            doc.addImage(logoImg, 'PNG', margin, yPos, 13, 11);
             doc.setFontSize(18);
             doc.text("Comprehensive Report", pageWidth / 2, yPos + 5, { align: 'center' });
             doc.setFontSize(12);
@@ -121,17 +134,13 @@ const ComprehensiveReport = () => {
             doc.text(dateRangeStr, margin, yPos);
             yPos += 10;
 
-            reportComponents.forEach(({ key }) => {
+            for (const { key } of reportComponents) {
                 const report = reportRefs.current[key];
-                if (!report || !report.chart || !report.tableData || report.tableData.length === 0) return;
+                if (!report || !report.chart || !report.tableData || report.tableData.length === 0) continue;
 
                 const { title, tableData, headers, chart } = report;
-                const chartImage = chart.toBase64Image();
-                const chartHeight = 80;
-                const tableHeight = (tableData.length + 1) * 5 + 10;
-                const sectionHeight = chartHeight + tableHeight + 20;
 
-                if (yPos + sectionHeight > pageHeight - margin) {
+                if (yPos + 100 > pageHeight - margin) { // Approximate height for chart + table
                     doc.addPage();
                     yPos = margin;
                 }
@@ -140,27 +149,40 @@ const ComprehensiveReport = () => {
                 doc.text(title, margin, yPos);
                 yPos += 8;
 
-                doc.addImage(chartImage, 'PNG', margin, yPos, pageWidth - (margin * 2), chartHeight);
-                yPos += chartHeight + 10;
+                try {
+                    const chartImage = chart.toBase64Image();
+                    doc.addImage(chartImage, 'PNG', margin, yPos, pageWidth - (margin * 2), 80);
+                    yPos += 90;
 
-                doc.autoTable({
-                    head: [headers],
-                    body: tableData,
-                    startY: yPos,
-                    theme: 'striped',
-                    headStyles: { fillColor: [22, 160, 133] },
-                    margin: { left: margin, right: margin }
-                });
-
-                yPos = doc.autoTable.previous.finalY + 10;
-            });
+                    doc.autoTable({
+                        head: [headers],
+                        body: tableData,
+                        startY: yPos,
+                        theme: 'striped',
+                        headStyles: { fillColor: [22, 160, 133] },
+                        margin: { left: margin, right: margin }
+                    });
+                    yPos = doc.autoTable.previous.finalY + 10;
+                } catch (error) {
+                    console.error(`Failed to process report section "${title}":`, error);
+                    yPos += 10; // Add space to avoid overlap
+                }
+            }
 
             doc.save(`comprehensive-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-            setIsExporting(false);
-        }, 100);
+
+        } catch (error) {
+            console.error("Failed to load logo, PDF generation aborted.", error);
+            alert("Error loading assets for PDF. Please try again.");
+        } finally {
+            // 3. Reset the exporting state
+            flushSync(() => {
+                setIsExporting(false);
+            });
+        }
     };
 
-    const reportComponents = [
+    const reportComponents = useMemo(() => [
         { key: 'salesByCustomerSails', label: 'Sales by Customer (Sails)', Component: SalesByCustomerSails, props: { orders: filteredOrders } },
         { key: 'salesByCustomerAccessories', label: 'Sales by Customer (Acc.)', Component: SalesByCustomerAccessories, props: { orders: filteredOrders } },
         { key: 'monthlyOrdersSails', label: 'Monthly Orders (Sails)', Component: MonthlyOrdersSails, props: { orders: filteredOrders } },
@@ -171,7 +193,7 @@ const ComprehensiveReport = () => {
         { key: 'productTypeAnalysisAccessories', label: 'Product Analysis (Acc.)', Component: ProductTypeAnalysisAccessories, props: { orders: filteredOrders } },
         { key: 'machineBreakdown', label: 'Machine Breakdowns', Component: MachineBreakdownReport, props: { breakdowns: filteredBreakdowns } },
         { key: 'lostTime', label: 'Lost Time', Component: LostTimeReport, props: { lostTimeEntries: filteredLostTime } },
-    ];
+    ], [filteredOrders, filteredBreakdowns, filteredLostTime]);
 
     return (
         <div className="container-fluid">
@@ -197,7 +219,17 @@ const ComprehensiveReport = () => {
                     {loading ? (
                         <div className="text-center py-5"><div className="spinner-border" role="status"><span className="visually-hidden">Loading...</span></div></div>
                     ) : (
-                        <>
+                        <div>
+                            {isExporting && (
+                                <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+                                    {reportComponents.map(({ key, Component, props }) => (
+                                        <div key={key} style={{ width: '800px', height: '600px' }}>
+                                            <Component {...props} ref={el => (reportRefs.current[key] = el)} />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             <ul className="nav nav-tabs">
                                 {reportComponents.map(({ key, label }) => (
                                     <li className="nav-item" key={key}>
@@ -216,7 +248,7 @@ const ComprehensiveReport = () => {
                                     </div>
                                 ))}
                             </div>
-                        </>
+                        </div>
                     )}
                 </div>
             </div>
