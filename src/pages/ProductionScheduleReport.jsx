@@ -94,7 +94,9 @@ const ProductionScheduleReport = () => {
         const unsubscribe = onSnapshot(ordersQuery, (snap) => {
             const ordersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             setAllOrders(ordersData);
-            const weeks = [...new Set(ordersData.map(o => o.deliveryWeek).filter(Boolean))];
+            // Filter out shipped orders before generating the list of weeks
+            const nonShippedOrders = ordersData.filter(o => o.status?.toLowerCase() !== 'shipped');
+            const weeks = [...new Set(nonShippedOrders.map(o => o.deliveryWeek).filter(Boolean))];
             weeks.sort();
             setDeliveryWeeks(weeks);
             setIsLoading(false);
