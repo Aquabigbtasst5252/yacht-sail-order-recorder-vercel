@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read access to orders for any authenticated user
+    match /orders/{orderId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Keep writes restricted for now
+    }
+
+    // Allow users to read their own user data
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+
+    // Allow read access to production statuses for authenticated users
+    match /productionStatuses/{statusId} {
+        allow read: if request.auth != null;
+    }
+
+    // Allow read access to settings for authenticated users
+    match /settings/{settingId} {
+        allow read: if request.auth != null;
+    }
+
+    // Allow read/write to order status history for authenticated users
+    match /orders/{orderId}/statusHistory/{historyId} {
+        allow read, write: if request.auth != null;
+    }
+  }
+}
