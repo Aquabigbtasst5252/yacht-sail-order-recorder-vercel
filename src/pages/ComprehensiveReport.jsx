@@ -38,21 +38,45 @@ const ComprehensiveReport = () => {
 
     useEffect(() => {
         setLoading(true);
+
+        const toDateSafe = (timestamp) => {
+            if (timestamp && typeof timestamp.toDate === 'function') {
+                return timestamp.toDate();
+            }
+            return null;
+        };
+
         const ordersQuery = query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(1000));
         const unsubOrders = onSnapshot(ordersQuery, (snap) => {
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), orderDate: d.data().orderDate?.toDate(), createdAt: d.data().createdAt?.toDate() }));
+            const data = snap.docs.map(d => ({
+                id: d.id,
+                ...d.data(),
+                orderDate: toDateSafe(d.data().orderDate),
+                createdAt: toDateSafe(d.data().createdAt)
+            }));
             setAllOrders(data);
         });
 
         const breakdownsQuery = query(collection(db, "machineBreakdowns"), orderBy("createdAt", "desc"), limit(1000));
         const unsubBreakdowns = onSnapshot(breakdownsQuery, (snap) => {
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() }));
+            const data = snap.docs.map(d => ({
+                id: d.id,
+                ...d.data(),
+                startTime: toDateSafe(d.data().startTime),
+                endTime: toDateSafe(d.data().endTime)
+            }));
             setMachineBreakdowns(data);
         });
 
         const lostTimeQuery = query(collection(db, "lostTimeEntries"), orderBy("createdAt", "desc"), limit(1000));
         const unsubLostTime = onSnapshot(lostTimeQuery, (snap) => {
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data(), startDate: d.data().startDate?.toDate(), startTime: d.data().startTime?.toDate(), endTime: d.data().endTime?.toDate() }));
+            const data = snap.docs.map(d => ({
+                id: d.id,
+                ...d.data(),
+                startDate: toDateSafe(d.data().startDate),
+                startTime: toDateSafe(d.data().startTime),
+                endTime: toDateSafe(d.data().endTime)
+            }));
             setLostTimeEntries(data);
         });
 
