@@ -40,8 +40,6 @@ const LostTimeEntries = ({ user }) => {
     const filteredEntries = useMemo(() => {
         return lostTimeEntries.filter(entry => {
             if (!entry.startDate) {
-                // This will filter out entries that are invalid in a way that they don't have a start date.
-                // The component will still render a row for entries that have a start date but are missing other fields.
                 return false;
             }
             const entryDate = entry.startDate.toDate();
@@ -214,14 +212,6 @@ const LostTimeEntries = ({ user }) => {
                                 if (!entry.startTime || !entry.endTime || !entry.startDate) {
                                     return (
                                         <tr key={entry.id}>
-                                            <td colSpan={6}>Invalid data for this entry.</td>
-                                            {user.role === 'super_admin' && (
-                                                <td>
-                                                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>
-                                                        Delete
-                                                    </button>
-                                                </td>
-                                            )}
                                         </tr>
                                     );
                                 }
