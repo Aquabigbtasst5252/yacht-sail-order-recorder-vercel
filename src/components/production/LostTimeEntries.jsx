@@ -16,7 +16,6 @@ const LostTimeEntries = ({ user }) => {
     const [searchedStartDate, setSearchedStartDate] = useState(filterStartDate);
     const [searchedEndDate, setSearchedEndDate] = useState(filterEndDate);
     const [activeTab, setActiveTab] = useState('All');
-
     const sections = useMemo(() => {
         const allSections = lostTimeEntries.map(entry => entry.section).filter(Boolean);
         return ['All', ...[...new Set(allSections)]];
@@ -33,6 +32,7 @@ const LostTimeEntries = ({ user }) => {
     }, []);
 
     const handleSearch = () => {
+      
         setSearchedStartDate(filterStartDate);
         setSearchedEndDate(filterEndDate);
     };
@@ -40,7 +40,6 @@ const LostTimeEntries = ({ user }) => {
     const filteredEntries = useMemo(() => {
         return lostTimeEntries.filter(entry => {
             if (!entry.startDate) {
-                return false;
             }
             const entryDate = entry.startDate.toDate();
             const startOfDay = new Date(searchedStartDate);
@@ -55,7 +54,7 @@ const LostTimeEntries = ({ user }) => {
             return entry.section === activeTab;
         });
     }, [lostTimeEntries, searchedStartDate, searchedEndDate, activeTab]);
-
+  
     const handleExportPDF = () => {
         const doc = new jsPDF({
             orientation: 'landscape',
@@ -65,15 +64,6 @@ const LostTimeEntries = ({ user }) => {
 
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
-
-        // Add black border
-        doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
-
-        // Add Logo with specified dimensions
-        const logo = '/logo.png';
-        doc.addImage(logo, 'PNG', 10, 10, 13, 11); // width 1.3cm, height 1.1cm
-
-        // Add Header Text
         doc.setFontSize(16);
         doc.text("Daily Lost Time Recording Form - Yacht sail Department", pageWidth / 2, 15, { align: 'center' });
         doc.setFontSize(12);
@@ -83,8 +73,6 @@ const LostTimeEntries = ({ user }) => {
             "Ref. No", "Date", "Order number", "Qty", "employee number",
             "Lost Time Reason", "Start time", "end time", "Signature if responsible person"
         ];
-
-        // Filter entries by date range for the entire PDF
         const dateFilteredEntries = lostTimeEntries.filter(entry => {
             if (!entry.startDate) return false;
             const entryDate = entry.startDate.toDate();
@@ -94,13 +82,6 @@ const LostTimeEntries = ({ user }) => {
             endOfDay.setHours(23, 59, 59, 999);
             return entryDate >= startOfDay && entryDate <= endOfDay;
         });
-
-        // Group entries by section
-        const groupedBySection = dateFilteredEntries.reduce((acc, entry) => {
-            const section = entry.section || 'Uncategorized';
-            if (!acc[section]) {
-                acc[section] = [];
-            }
             acc[section].push(entry);
             return acc;
         }, {});
@@ -112,15 +93,11 @@ const LostTimeEntries = ({ user }) => {
             doc.text("No entries found for the selected date range.", 10, startY);
         } else {
             sectionsToExport.forEach((section, index) => {
-                if (index > 0) {
-                    startY = doc.lastAutoTable.finalY + 15;
-                }
 
                 if (startY > pageHeight - 30) {
                     doc.addPage();
                     startY = 15;
                 }
-
                 doc.setFontSize(14);
                 doc.text(`Section: ${section}`, 10, startY);
                 startY += 8;
@@ -144,13 +121,6 @@ const LostTimeEntries = ({ user }) => {
                     theme: 'striped',
                     headStyles: { fillColor: [22, 160, 133] },
                     styles: { fontSize: 8 },
-                    columnStyles: {
-                        8: { cellWidth: 40 },
-                    }
-                });
-            });
-        }
-
         doc.save(`lost-time-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
 
@@ -185,7 +155,6 @@ const LostTimeEntries = ({ user }) => {
                         <li className="nav-item" key={section}>
                             <button
                                 className={`nav-link ${activeTab === section ? 'active' : ''}`}
-                                onClick={() => setActiveTab(section)}
                             >
                                 {section}
                             </button>
@@ -208,10 +177,6 @@ const LostTimeEntries = ({ user }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredEntries.map(entry => {
-                                if (!entry.startTime || !entry.endTime || !entry.startDate) {
-                                    return (
-                                        <tr key={entry.id}>
                                         </tr>
                                     );
                                 }
