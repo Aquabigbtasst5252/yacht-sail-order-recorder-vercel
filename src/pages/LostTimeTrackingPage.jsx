@@ -1,12 +1,14 @@
 // src/pages/LostTimeTrackingPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import LostTimeEntries from '../components/production/LostTimeEntries';
+import { format } from 'date-fns';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const LostTimeTrackingPage = ({ user }) => {
     // Form state
@@ -20,11 +22,21 @@ const LostTimeTrackingPage = ({ user }) => {
     const [selectedLostTimeCode, setSelectedLostTimeCode] = useState(null);
     const [responsiblePerson, setResponsiblePerson] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [key, setKey] = useState(0);
 
     // Data state
     const [employees, setEmployees] = useState([]);
     const [lostTimeCodes, setLostTimeCodes] = useState([]);
+    const [lostTimeEntries, setLostTimeEntries] = useState([]);
+
+    // Filter state
+    const [filterStartDate, setFilterStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 7)));
+    const [filterEndDate, setFilterEndDate] = useState(new Date());
+
+    const fetchLostTimeEntries = async () => {
+        const entriesCollectionRef = query(collection(db, 'lostTimeEntries'), orderBy('createdAt', 'desc'));
+        const data = await getDocs(entriesCollectionRef);
+        setLostTimeEntries(data.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+    };
 
     useEffect(() => {
         const fetchDropdownData = async () => {
@@ -49,7 +61,98 @@ const LostTimeTrackingPage = ({ user }) => {
         };
 
         fetchDropdownData();
+        fetchLostTimeEntries();
     }, []);
+
+    const filteredEntries = useMemo(() => {
+        return lostTimeEntries.filter(entry => {
+            // Add a defensive check here
+            if (!entry.startDate) {
+                return false;
+            }
+            const entryDate = entry.startDate.toDate();
+            const startOfDay = new Date(filterStartDate);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(filterEndDate);
+            endOfDay.setHours(23, 59, 59, 999);
+            return entryDate >= startOfDay && entryDate <= endOfDay;
+        });
+    }, [lostTimeEntries, filterStartDate, filterEndDate]);
+
+    const handleExportPDF = () => {
+        const doc = new jsPDF({
+            orientation: 'landscape',
+            unit: 'mm',
+            format: 'a4'
+        });
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+
+        // Add black border
+        doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
+
+        // Add Logo with specified dimensions
+        const logo = '/logo.png';
+        doc.addImage(logo, 'PNG', 10, 10, 13, 11); // width 1.3cm, height 1.1cm
+
+        // Add Header Text
+        doc.setFontSize(16);
+        doc.text("Daily Lost Time Recording Form - Yacht sail Department", pageWidth / 2, 15, { align: 'center' });
+        doc.setFontSize(12);
+        doc.text("Aqua Dynamics (Pvt) Ltd.", pageWidth / 2, 22, { align: 'center' });
+
+        // Define table columns as per new requirements
+        const tableColumn = [
+            "Ref. No", "Date", "Order number", "Qty", "employee number",
+            "Lost Time Reason", "Start time", "end time", "Signature if responsible person"
+        ];
+        const tableRows = [];
+
+        // Prepare table rows from filtered entries
+        filteredEntries.forEach((entry, index) => {
+            const entryData = [
+                index + 1, // Ref. No
+                format(entry.startDate.toDate(), 'yyyy-MM-dd'),
+                entry.orderNumber,
+                entry.orderQuantity,
+                entry.epfNumber,
+                entry.lostTimeReason,
+                format(entry.startTime.toDate(), 'HH:mm'),
+                format(entry.endTime.toDate(), 'HH:mm'),
+                '' // Blank for signature
+            ];
+            tableRows.push(entryData);
+        });
+
+        // Add the table to the PDF
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 35,
+            theme: 'striped',
+            headStyles: { fillColor: [22, 160, 133] },
+            styles: { fontSize: 8 },
+            columnStyles: {
+                8: { cellWidth: 40 }, // Widen the signature column
+            }
+        });
+
+        doc.save(`lost-time-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    };
+
+    const handleDelete = async (id) => {
+        if (window.confirm("Are you sure you want to delete this entry?")) {
+            try {
+                await deleteDoc(doc(db, "lostTimeEntries", id));
+                toast.success("Entry deleted successfully!");
+                fetchLostTimeEntries(); // Refresh the list
+            } catch (error) {
+                toast.error("Failed to delete entry. Please try again.");
+                console.error("Error deleting document: ", error);
+            }
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -75,7 +178,7 @@ const LostTimeTrackingPage = ({ user }) => {
                 createdAt: serverTimestamp()
             });
             toast.success('Lost time entry saved successfully!');
-            setKey(prevKey => prevKey + 1); // Re-mount the LostTimeEntries component
+            fetchLostTimeEntries(); // Refresh data
             // Reset form
             setStartDate(new Date());
             setStartTime(new Date());
@@ -162,7 +265,67 @@ const LostTimeTrackingPage = ({ user }) => {
                 </div>
             </div>
 
-            <LostTimeEntries key={key} user={user} />
+            <div className="card">
+                <div className="card-header d-flex justify-content-between align-items-center">
+                    <h3 className="mb-0">Lost Time Entries</h3>
+                    <div className="d-flex align-items-center">
+                        <DatePicker selected={filterStartDate} onChange={date => setFilterStartDate(date)} className="form-control form-control-sm me-2" />
+                        <span className="me-2">to</span>
+                        <DatePicker selected={filterEndDate} onChange={date => setFilterEndDate(date)} className="form-control form-control-sm me-3" />
+                        <button className="btn btn-sm btn-success" onClick={handleExportPDF}>Export PDF</button>
+                    </div>
+                </div>
+                <div className="card-body">
+                    <div className="table-responsive">
+                        <table className="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Employee</th>
+                                    <th>Section</th>
+                                    <th>Lost Time Reason</th>
+                                    <th>Order #</th>
+                                    <th>Duration (mins)</th>
+                                    {user.role === 'super_admin' && <th>Actions</th>}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredEntries.map(entry => {
+                                    // Defensive checks for dates before calculating duration
+                                    if (!entry.startTime || !entry.endTime || !entry.startDate) {
+                                        // Optionally, render a placeholder or skip the row
+                                        return (
+                                            <tr key={entry.id}>
+                                                <td colSpan={user.role === 'super_admin' ? 7 : 6}>
+                                                    Invalid data for this entry.
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
+                                    const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000; // duration in minutes
+                                    return (
+                                        <tr key={entry.id}>
+                                            <td>{format(entry.startDate.toDate(), 'yyyy-MM-dd')}</td>
+                                            <td>{entry.employeeName}</td>
+                                            <td>{entry.section}</td>
+                                            <td>{entry.lostTimeReason}</td>
+                                            <td>{entry.orderNumber}</td>
+                                            <td>{duration.toFixed(2)}</td>
+                                            {user.role === 'super_admin' && (
+                                                <td>
+                                                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>
+                                                        Delete
+                                                    </button>
+                                                </td>
+                                            )}
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </>
     );
 };
