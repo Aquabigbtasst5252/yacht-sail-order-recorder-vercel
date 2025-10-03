@@ -16,6 +16,9 @@ const LostTimeEntries = ({ user }) => {
     const [searchedStartDate, setSearchedStartDate] = useState(filterStartDate);
     const [searchedEndDate, setSearchedEndDate] = useState(filterEndDate);
     const [activeTab, setActiveTab] = useState('All');
+    const [currentPage, setCurrentPage] = useState(1);
+    const ENTRIES_PER_PAGE = 20;
+
     const sections = useMemo(() => {
         const allSections = lostTimeEntries.map(entry => entry.section).filter(Boolean);
         return ['All', ...[...new Set(allSections)]];
@@ -32,7 +35,7 @@ const LostTimeEntries = ({ user }) => {
     }, []);
 
     const handleSearch = () => {
-      
+        setCurrentPage(1); // Reset to first page on new search
         setSearchedStartDate(filterStartDate);
         setSearchedEndDate(filterEndDate);
     };
@@ -40,6 +43,7 @@ const LostTimeEntries = ({ user }) => {
     const filteredEntries = useMemo(() => {
         return lostTimeEntries.filter(entry => {
             if (!entry.startDate) {
+                return true; // Keep invalid entries for management
             }
             const entryDate = entry.startDate.toDate();
             const startOfDay = new Date(searchedStartDate);
@@ -54,7 +58,13 @@ const LostTimeEntries = ({ user }) => {
             return entry.section === activeTab;
         });
     }, [lostTimeEntries, searchedStartDate, searchedEndDate, activeTab]);
-  
+
+    const totalPages = Math.ceil(filteredEntries.length / ENTRIES_PER_PAGE);
+    const paginatedEntries = useMemo(() => {
+        const startIndex = (currentPage - 1) * ENTRIES_PER_PAGE;
+        return filteredEntries.slice(startIndex, startIndex + ENTRIES_PER_PAGE);
+    }, [filteredEntries, currentPage]);
+
     const handleExportPDF = () => {
         const doc = new jsPDF({
             orientation: 'landscape',
@@ -64,6 +74,10 @@ const LostTimeEntries = ({ user }) => {
 
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
+
+        doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
+        const logo = '/logo.png';
+        doc.addImage(logo, 'PNG', 10, 10, 13, 11);
         doc.setFontSize(16);
         doc.text("Daily Lost Time Recording Form - Yacht sail Department", pageWidth / 2, 15, { align: 'center' });
         doc.setFontSize(12);
@@ -73,6 +87,7 @@ const LostTimeEntries = ({ user }) => {
             "Ref. No", "Date", "Order number", "Qty", "employee number",
             "Lost Time Reason", "Start time", "end time", "Signature if responsible person"
         ];
+
         const dateFilteredEntries = lostTimeEntries.filter(entry => {
             if (!entry.startDate) return false;
             const entryDate = entry.startDate.toDate();
@@ -82,9 +97,18 @@ const LostTimeEntries = ({ user }) => {
             endOfDay.setHours(23, 59, 59, 999);
             return entryDate >= startOfDay && entryDate <= endOfDay;
         });
-            acc[section].push(entry);
-            return acc;
-        }, {});
+
+        const groupedBySection = dateFilteredEntries.reduce(
+            (acc, entry) => {
+                const section = entry.section || 'Uncategorized';
+                if (!acc[section]) {
+                    acc[section] = [];
+                }
+                acc[section].push(entry);
+                return acc;
+            },
+            {}
+        );
 
         let startY = 35;
         const sectionsToExport = Object.keys(groupedBySection).sort();
@@ -93,7 +117,7 @@ const LostTimeEntries = ({ user }) => {
             doc.text("No entries found for the selected date range.", 10, startY);
         } else {
             sectionsToExport.forEach((section, index) => {
-
+                if (index > 0) startY = doc.lastAutoTable.finalY + 15;
                 if (startY > pageHeight - 30) {
                     doc.addPage();
                     startY = 15;
@@ -121,6 +145,10 @@ const LostTimeEntries = ({ user }) => {
                     theme: 'striped',
                     headStyles: { fillColor: [22, 160, 133] },
                     styles: { fontSize: 8 },
+                    columnStyles: { 8: { cellWidth: 40 } }
+                });
+            });
+        }
         doc.save(`lost-time-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
 
@@ -155,6 +183,7 @@ const LostTimeEntries = ({ user }) => {
                         <li className="nav-item" key={section}>
                             <button
                                 className={`nav-link ${activeTab === section ? 'active' : ''}`}
+                                onClick={() => { setActiveTab(section); setCurrentPage(1); }}
                             >
                                 {section}
                             </button>
@@ -177,6 +206,18 @@ const LostTimeEntries = ({ user }) => {
                             </tr>
                         </thead>
                         <tbody>
+                            {paginatedEntries.map(entry => {
+                                if (!entry.startTime || !entry.endTime || !entry.startDate) {
+                                    return (
+                                        <tr key={entry.id}>
+                                            <td colSpan={6}>Invalid data for this entry.</td>
+                                            {user.role === 'super_admin' && (
+                                                <td>
+                                                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>
+                                                        Delete
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 }
@@ -201,6 +242,27 @@ const LostTimeEntries = ({ user }) => {
                             })}
                         </tbody>
                     </table>
+                </div>
+                <div className="d-flex justify-content-end align-items-center mt-3">
+                    <span className="me-3">
+                        Page {currentPage} of {totalPages}
+                    </span>
+                    <div className="btn-group">
+                        <button
+                            className="btn btn-outline-secondary"
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                        >
+                            Previous
+                        </button>
+                        <button
+                            className="btn btn-outline-secondary"
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages || totalPages === 0}
+                        >
+                            Next
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
