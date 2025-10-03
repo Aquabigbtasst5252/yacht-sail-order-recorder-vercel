@@ -212,9 +212,6 @@ const LostTimeEntries = ({ user }) => {
                                 if (!entry.startTime || !entry.endTime || !entry.startDate) {
                                     return (
                                         <tr key={entry.id}>
-                                            <td colSpan={user.role === 'super_admin' ? 7 : 6}>
-                                                Invalid data for this entry.
-                                            </td>
                                         </tr>
                                     );
                                 }
