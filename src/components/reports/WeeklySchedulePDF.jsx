@@ -140,7 +140,7 @@ const WeeklySchedulePDF = ({ ordersByCustomer, shippedOrders, selectedWeek }) =>
                     <View break>
                         <Text style={styles.shippedHeader}>Shipped Orders</Text>
                         <View style={styles.table}>
-                             {/* Header Row for Shipped */}
+                            {/* Header Row for Shipped */}
                             <View style={styles.tableRow} fixed>
                                 <Text style={{...styles.tableColHeader, ...styles.shippedTableCol}}>Aqua Order #</Text>
                                 <Text style={{...styles.tableColHeader, ...styles.shippedTableCol}}>Customer PO</Text>
