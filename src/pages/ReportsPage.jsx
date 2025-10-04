@@ -9,13 +9,6 @@ const ReportsPage = ({ onNavigate }) => {
                 <button
                     type="button"
                     className="list-group-item list-group-item-action"
-                    onClick={() => onNavigate('production-schedule-report')}
-                >
-                    Production Schedule Report
-                </button>
-                <button
-                    type="button"
-                    className="list-group-item list-group-item-action"
                     onClick={() => onNavigate('comprehensive-report')}
                 >
                     Comprehensive Report
