@@ -19,7 +19,7 @@ const getCurrentWeek = () => {
     return `${year}-${String(week).padStart(2, '0')}`;
 };
 
-const WeeklyScheduleView = ({ user }) => {
+const WeeklyScheduleView = ({ user, onNavigate }) => {
     const [allOrders, setAllOrders] = useState([]);
     const [productionStatuses, setProductionStatuses] = useState([]);
     const [deliveryWeeks, setDeliveryWeeks] = useState([]);
@@ -142,6 +142,14 @@ const WeeklyScheduleView = ({ user }) => {
     return (
         <div>
             <div className="d-flex justify-content-end align-items-center mb-3">
+                {!isCustomer && (
+                    <button
+                        className="btn btn-info me-3"
+                        onClick={() => onNavigate('production-schedule-report')}
+                    >
+                        Production Schedule Report
+                    </button>
+                )}
                 <div className="col-md-4">
                     <select className="form-select" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
                         <option value="">Select Delivery Week...</option>
