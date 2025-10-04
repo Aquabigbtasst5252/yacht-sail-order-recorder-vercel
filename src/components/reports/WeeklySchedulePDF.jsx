@@ -92,8 +92,8 @@ const WeeklySchedulePDF = ({ ordersByCustomer, shippedOrders, selectedWeek }) =>
                 <Text style={styles.header}>{documentTitle}</Text>
 
                 {hasActiveOrders ? (
-                    Object.keys(ordersByCustomer).sort().map((customerName, index) => (
-                        <View key={customerName} break={index > 0}>
+                    Object.keys(ordersByCustomer).sort().map((customerName) => (
+                        <View key={customerName}>
                             <Text style={styles.customerHeader}>{customerName}</Text>
                             <View style={styles.table}>
                                 {/* Header Row */}
