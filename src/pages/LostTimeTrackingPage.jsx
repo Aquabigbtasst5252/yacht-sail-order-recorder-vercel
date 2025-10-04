@@ -1,4 +1,3 @@
-// src/pages/LostTimeTrackingPage.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
@@ -172,7 +171,7 @@ const LostTimeTrackingPage = ({ user }) => {
             doc.text(`Section: ${section}`, 10, startY - 5);
 
             const tableRows = entries.map((entry, index) => {
-                 if (!entry.startTime || !entry.endTime || !entry.startDate) {
+                if (!entry.startTime || !entry.endTime || !entry.startDate) {
                     return [index + 1, "Invalid data", "", "", "", "", "", "", ""];
                 }
                 const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000;
@@ -201,7 +200,7 @@ const LostTimeTrackingPage = ({ user }) => {
                     startY = data.cursor.y + 15;
                 }
             });
-             // Update startY for the next table on the same page
+            // Update startY for the next table on the same page
             startY = doc.lastAutoTable.finalY + 15;
 
             // Add a new page if the next table will overflow
@@ -307,30 +306,30 @@ const LostTimeTrackingPage = ({ user }) => {
                                 </div>
                             </div>
                         </div>
-                    <div className="row">
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Order Number</label>
-                            <input type="text" className="form-control" value={orderNumber} onChange={e => setOrderNumber(e.target.value)} />
+                        <div className="row">
+                            <div className="col-md-6 mb-3">
+                                <label className="form-label">Order Number</label>
+                                <input type="text" className="form-control" value={orderNumber} onChange={e => setOrderNumber(e.target.value)} />
+                            </div>
+                            <div className="col-md-6 mb-3">
+                                <label className="form-label">Order Quantity</label>
+                                <input type="number" className="form-control" value={orderQuantity} onChange={e => setOrderQuantity(e.target.value)} />
+                            </div>
                         </div>
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Order Quantity</label>
-                            <input type="number" className="form-control" value={orderQuantity} onChange={e => setOrderQuantity(e.target.value)} />
+                        <div className="row">
+                            <div className="col-md-6 mb-3">
+                                <label className="form-label">EPF Number (Employee)</label>
+                                <Select options={employees} value={selectedEmployee} onChange={setSelectedEmployee} isClearable isSearchable placeholder="Search by name or EPF number..." />
+                            </div>
+                            <div className="col-md-6 mb-3">
+                                <label className="form-label">Lost Time Code</label>
+                                <Select options={lostTimeCodes} value={selectedLostTimeCode} onChange={setSelectedLostTimeCode} isClearable placeholder="Select a lost time code..." />
+                            </div>
                         </div>
-                    </div>
-                    <div className="row">
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">EPF Number (Employee)</label>
-                            <Select options={employees} value={selectedEmployee} onChange={setSelectedEmployee} isClearable isSearchable placeholder="Search by name or EPF number..." />
+                        <div className="mb-3">
+                            <label className="form-label">Signature of Responsible Person</label>
+                            <input type="text" className="form-control" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} />
                         </div>
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Lost Time Code</label>
-                             <Select options={lostTimeCodes} value={selectedLostTimeCode} onChange={setSelectedLostTimeCode} isClearable placeholder="Select a lost time code..." />
-                        </div>
-                    </div>
-                    <div className="mb-3">
-                        <label className="form-label">Signature of Responsible Person</label>
-                        <input type="text" className="form-control" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} />
-                    </div>
                         <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                             {isSubmitting ? 'Saving...' : 'Save Entry'}
                         </button>
@@ -382,7 +381,7 @@ const LostTimeTrackingPage = ({ user }) => {
                                             if (!entry.startTime || !entry.endTime || !entry.startDate) {
                                                 return (
                                                     <tr key={entry.id}>
-                                                         <td colSpan={user.role === 'super_admin' ? 7 : 6}>
+                                                        <td colSpan={user.role === 'super_admin' ? 7 : 6}>
                                                             Invalid data for this entry.
                                                         </td>
                                                         {user.role === 'super_admin' && (
