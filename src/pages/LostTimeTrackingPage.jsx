@@ -22,6 +22,12 @@ const LostTimeTrackingPage = ({ user }) => {
     const [responsiblePerson, setResponsiblePerson] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Machine Breakdown state
+    const [machines, setMachines] = useState([]);
+    const [breakdownReasons, setBreakdownReasons] = useState([]);
+    const [selectedMachine, setSelectedMachine] = useState(null);
+    const [selectedBreakdownReason, setSelectedBreakdownReason] = useState(null);
+
     // Data state
     const [employees, setEmployees] = useState([]);
     const [lostTimeCodes, setLostTimeCodes] = useState([]);
@@ -91,7 +97,30 @@ const LostTimeTrackingPage = ({ user }) => {
                 value: doc.data().code,
                 label: `${doc.data().code} - ${doc.data().reason}`
             }));
-            setLostTimeCodes(codeOptions);
+             // Add machine breakdown as a lost time code
+             const allLostTimeCodes = [
+                ...codeOptions,
+                { value: 'machine_breakdown', label: 'Machine Breakdown' }
+            ];
+            setLostTimeCodes(allLostTimeCodes);
+
+            // Fetch machines
+            const machinesCollectionRef = collection(db, 'machines');
+            const machineData = await getDocs(machinesCollectionRef);
+            const machineOptions = machineData.docs.map(doc => ({
+                value: doc.id,
+                label: doc.data().name
+            }));
+            setMachines(machineOptions);
+
+            // Fetch breakdown reasons
+            const reasonsCollectionRef = collection(db, 'breakdownReasons');
+            const reasonData = await getDocs(reasonsCollectionRef);
+            const reasonOptions = reasonData.docs.map(doc => ({
+                value: doc.id,
+                label: `${doc.data().code} - ${doc.data().reason}`
+            }));
+            setBreakdownReasons(reasonOptions);
         };
 
         fetchDropdownData();
@@ -100,8 +129,25 @@ const LostTimeTrackingPage = ({ user }) => {
 
     // Get unique sections for tabs from all filtered entries
     const sections = useMemo(() => {
-        const allSections = [...new Set(filteredEntries.map(entry => entry.section || 'Uncategorized'))];
-        return ['All', ...allSections.sort()];
+        // Regular sections from 'lostTime' entries
+        const regularSections = [...new Set(
+            filteredEntries
+                .filter(entry => entry.type !== 'machineBreakdown' && entry.section)
+                .map(entry => entry.section)
+        )];
+
+        // Check if there are any machine breakdown entries
+        const hasMachineBreakdowns = filteredEntries.some(entry => entry.type === 'machineBreakdown');
+
+        const allTabs = ['All', ...regularSections.sort()];
+        if (hasMachineBreakdowns) {
+            // Ensure 'Machine Breakdown' is added only once and at the end
+            if (!allTabs.includes('Machine Breakdown')) {
+                allTabs.push('Machine Breakdown');
+            }
+        }
+
+        return allTabs;
     }, [filteredEntries]);
 
     // Filter entries based on the active tab
@@ -109,7 +155,13 @@ const LostTimeTrackingPage = ({ user }) => {
         if (activeTab === 'All') {
             return filteredEntries;
         }
-        return filteredEntries.filter(entry => (entry.section || 'Uncategorized') === activeTab);
+        if (activeTab === 'Machine Breakdown') {
+            return filteredEntries.filter(entry => entry.type === 'machineBreakdown');
+        }
+        // For other tabs, filter by section but exclude machine breakdowns
+        return filteredEntries.filter(
+            entry => entry.type !== 'machineBreakdown' && (entry.section || 'Uncategorized') === activeTab
+        );
     }, [filteredEntries, activeTab]);
 
     // Reset page to 1 when tab changes
@@ -127,60 +179,66 @@ const LostTimeTrackingPage = ({ user }) => {
 
     // Group all filtered entries for PDF export, not just the current page
     const groupedEntriesForPdf = useMemo(() => {
-        return filteredEntries.reduce((acc, entry) => {
+        // Separate entries by type
+        const lostTime = filteredEntries.filter(e => e.type !== 'machineBreakdown');
+        const breakdowns = filteredEntries.filter(e => e.type === 'machineBreakdown');
+
+        // Group lost time by section
+        const groupedLostTime = lostTime.reduce((acc, entry) => {
             const section = entry.section || 'Uncategorized';
-            if (!acc[section]) {
-                acc[section] = [];
-            }
+            if (!acc[section]) acc[section] = [];
             acc[section].push(entry);
             return acc;
         }, {});
+
+        return { lostTime: groupedLostTime, breakdowns };
     }, [filteredEntries]);
 
     const handleExportPDF = () => {
-        const doc = new jsPDF({
-            orientation: 'landscape',
-            unit: 'mm',
-            format: 'a4'
-        });
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
-        let startY = 35; // Initial Y position for the first table
+        let startY = 35;
 
-        // Add black border
-        doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
+        const drawPageHeader = () => {
+            doc.rect(5, 5, pageWidth - 10, pageHeight - 10); // Border
+            const logo = '/logo.png';
+            doc.addImage(logo, 'PNG', 10, 10, 13, 11);
+            doc.setFontSize(16);
+            doc.text("Daily Lost Time & Machine Breakdown Report", pageWidth / 2, 15, { align: 'center' });
+            doc.setFontSize(12);
+            doc.text("Aqua Dynamics (Pvt) Ltd.", pageWidth / 2, 22, { align: 'center' });
+        };
 
-        // Add Logo
-        const logo = '/logo.png';
-        doc.addImage(logo, 'PNG', 10, 10, 13, 11);
+        const checkNewPage = () => {
+            if (startY > pageHeight - 30) {
+                doc.addPage();
+                drawPageHeader();
+                startY = 35;
+            }
+        };
 
-        // Add Header Text
-        doc.setFontSize(16);
-        doc.text("Daily Lost Time Recording Form", pageWidth / 2, 15, { align: 'center' });
-        doc.setFontSize(12);
-        doc.text("Aqua Dynamics (Pvt) Ltd.", pageWidth / 2, 22, { align: 'center' });
+        drawPageHeader();
 
-        const tableColumn = [
-            "Ref. No", "Date", "Order number", "Qty", "Employee Number",
-            "Lost Time Reason", "Start Time", "End Time", "Duration (mins)"
-        ];
+        // 1. Lost Time Entries
+        doc.setFontSize(14);
+        doc.text("Lost Time Entries", 10, startY - 5);
+        startY += 5;
 
-        Object.entries(groupedEntriesForPdf).forEach(([section, entries]) => {
-            // Add section header
-            doc.setFontSize(14);
+        const lostTimeColumn = ["Ref.", "Date", "Order #", "Qty", "Employee", "Lost Time Reason", "Start", "End", "Duration (mins)"];
+        Object.entries(groupedEntriesForPdf.lostTime).forEach(([section, entries]) => {
+            checkNewPage();
+            doc.setFontSize(12);
             doc.text(`Section: ${section}`, 10, startY - 5);
 
             const tableRows = entries.map((entry, index) => {
-                if (!entry.startTime || !entry.endTime || !entry.startDate) {
-                    return [index + 1, "Invalid data", "", "", "", "", "", "", ""];
-                }
                 const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000;
                 return [
                     index + 1,
                     format(entry.startDate.toDate(), 'yyyy-MM-dd'),
                     entry.orderNumber,
                     entry.orderQuantity,
-                    entry.epfNumber,
+                    entry.employeeName,
                     entry.lostTimeReason,
                     format(entry.startTime.toDate(), 'HH:mm'),
                     format(entry.endTime.toDate(), 'HH:mm'),
@@ -189,28 +247,51 @@ const LostTimeTrackingPage = ({ user }) => {
             });
 
             autoTable(doc, {
-                head: [tableColumn],
+                head: [lostTimeColumn],
                 body: tableRows,
                 startY: startY,
                 theme: 'striped',
                 headStyles: { fillColor: [22, 160, 133] },
                 styles: { fontSize: 8 },
-                didDrawPage: (data) => {
-                    // Reset startY for new pages
-                    startY = data.cursor.y + 15;
-                }
             });
-            // Update startY for the next table on the same page
             startY = doc.lastAutoTable.finalY + 15;
-
-            // Add a new page if the next table will overflow
-            if (startY > pageHeight - 30) {
-                doc.addPage();
-                startY = 20; // Reset Y position for new page
-            }
         });
 
-        doc.save(`lost-time-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+        // 2. Machine Breakdown Entries
+        if (groupedEntriesForPdf.breakdowns.length > 0) {
+            checkNewPage();
+            startY += 10; // Add some space
+            checkNewPage();
+            doc.setFontSize(14);
+            doc.text("Machine Breakdown Entries", 10, startY - 5);
+            startY += 5;
+
+            const breakdownColumn = ["Ref.", "Date", "Machine", "Breakdown Reason", "Operator", "Start", "End", "Duration (mins)"];
+            const breakdownRows = groupedEntriesForPdf.breakdowns.map((entry, index) => {
+                const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000;
+                return [
+                    index + 1,
+                    format(entry.startDate.toDate(), 'yyyy-MM-dd'),
+                    entry.machineName,
+                    entry.breakdownReason,
+                    entry.employeeName,
+                    format(entry.startTime.toDate(), 'HH:mm'),
+                    format(entry.endTime.toDate(), 'HH:mm'),
+                    duration.toFixed(2)
+                ];
+            });
+
+            autoTable(doc, {
+                head: [breakdownColumn],
+                body: breakdownRows,
+                startY: startY,
+                theme: 'striped',
+                headStyles: { fillColor: [203, 67, 53] }, // Different color for breakdown
+                styles: { fontSize: 8 },
+            });
+        }
+
+        doc.save(`lost-time-and-breakdown-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
 
     const handleDelete = async (id) => {
@@ -231,24 +312,39 @@ const LostTimeTrackingPage = ({ user }) => {
         if (!selectedEmployee || !selectedLostTimeCode) {
             return toast.error('Please fill out all required fields.');
         }
+
+        const isMachineBreakdown = selectedLostTimeCode.value === 'machine_breakdown';
+
+        if (isMachineBreakdown && (!selectedMachine || !selectedBreakdownReason)) {
+            return toast.error('Please select a machine and breakdown reason.');
+        }
+
         setIsSubmitting(true);
 
+        const entryData = {
+            startDate,
+            startTime,
+            endDate,
+            endTime,
+            orderNumber,
+            orderQuantity,
+            epfNumber: selectedEmployee.value,
+            employeeName: selectedEmployee.label.split(' (')[0],
+            section: isMachineBreakdown ? 'Machine Breakdown' : selectedEmployee.section,
+            lostTimeCode: selectedLostTimeCode.value,
+            lostTimeReason: selectedLostTimeCode.label,
+            responsiblePerson,
+            type: isMachineBreakdown ? 'machineBreakdown' : 'lostTime',
+            createdAt: serverTimestamp()
+        };
+
+        if (isMachineBreakdown) {
+            entryData.machineName = selectedMachine.label;
+            entryData.breakdownReason = selectedBreakdownReason.label;
+        }
+
         try {
-            await addDoc(collection(db, 'lostTimeEntries'), {
-                startDate,
-                startTime,
-                endDate,
-                endTime,
-                orderNumber,
-                orderQuantity,
-                epfNumber: selectedEmployee.value,
-                employeeName: selectedEmployee.label.split(' (')[0],
-                section: selectedEmployee.section,
-                lostTimeCode: selectedLostTimeCode.value,
-                lostTimeReason: selectedLostTimeCode.label,
-                responsiblePerson,
-                createdAt: serverTimestamp()
-            });
+            await addDoc(collection(db, 'lostTimeEntries'), entryData);
             toast.success('Lost time entry saved successfully!');
             fetchLostTimeEntries(); // Refresh data
             // Reset form
@@ -261,6 +357,8 @@ const LostTimeTrackingPage = ({ user }) => {
             setSelectedEmployee(null);
             setSelectedLostTimeCode(null);
             setResponsiblePerson('');
+            setSelectedMachine(null);
+            setSelectedBreakdownReason(null);
         } catch (error) {
             toast.error('Failed to save lost time entry. Please try again.');
             console.error("Error adding document: ", error);
@@ -326,6 +424,20 @@ const LostTimeTrackingPage = ({ user }) => {
                                 <Select options={lostTimeCodes} value={selectedLostTimeCode} onChange={setSelectedLostTimeCode} isClearable placeholder="Select a lost time code..." />
                             </div>
                         </div>
+
+                        {selectedLostTimeCode && selectedLostTimeCode.value === 'machine_breakdown' && (
+                            <div className="row">
+                                <div className="col-md-6 mb-3">
+                                    <label className="form-label">Machine Name</label>
+                                    <Select options={machines} value={selectedMachine} onChange={setSelectedMachine} isClearable placeholder="Select a machine..." />
+                                </div>
+                                <div className="col-md-6 mb-3">
+                                    <label className="form-label">Breakdown Reason</label>
+                                    <Select options={breakdownReasons} value={selectedBreakdownReason} onChange={setSelectedBreakdownReason} isClearable placeholder="Select a reason..." />
+                                </div>
+                            </div>
+                        )}
+
                         <div className="mb-3">
                             <label className="form-label">Signature of Responsible Person</label>
                             <input type="text" className="form-control" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} />
@@ -367,9 +479,19 @@ const LostTimeTrackingPage = ({ user }) => {
                                 <thead>
                                     <tr>
                                         <th>Date</th>
-                                        <th>Employee</th>
-                                        <th>Section</th>
-                                        <th>Lost Time Reason</th>
+                                        {activeTab === 'Machine Breakdown' ? (
+                                            <>
+                                                <th>Machine Name</th>
+                                                <th>Breakdown Reason</th>
+                                                <th>Operator</th>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <th>Employee</th>
+                                                <th>Section</th>
+                                                <th>Lost Time Reason</th>
+                                            </>
+                                        )}
                                         <th>Order #</th>
                                         <th>Duration (mins)</th>
                                         {user.role === 'super_admin' && <th>Actions</th>}
@@ -396,9 +518,19 @@ const LostTimeTrackingPage = ({ user }) => {
                                             return (
                                                 <tr key={entry.id}>
                                                     <td>{format(entry.startDate.toDate(), 'yyyy-MM-dd')}</td>
-                                                    <td>{entry.employeeName}</td>
-                                                    <td>{entry.section}</td>
-                                                    <td>{entry.lostTimeReason}</td>
+                                                    {activeTab === 'Machine Breakdown' ? (
+                                                        <>
+                                                            <td>{entry.machineName}</td>
+                                                            <td>{entry.breakdownReason}</td>
+                                                            <td>{entry.employeeName}</td>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <td>{entry.employeeName}</td>
+                                                            <td>{entry.section}</td>
+                                                            <td>{entry.lostTimeReason}</td>
+                                                        </>
+                                                    )}
                                                     <td>{entry.orderNumber}</td>
                                                     <td>{duration.toFixed(2)}</td>
                                                     {user.role === 'super_admin' && (
