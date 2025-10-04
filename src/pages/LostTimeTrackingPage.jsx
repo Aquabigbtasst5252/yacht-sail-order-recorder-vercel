@@ -80,15 +80,32 @@ const LostTimeTrackingPage = ({ user }) => {
 
     useEffect(() => {
         const fetchDropdownData = async () => {
-            // Fetch employees
+            // Fetch employees and group them by section
             const employeesCollectionRef = collection(db, 'employees');
             const empData = await getDocs(employeesCollectionRef);
-            const employeeOptions = empData.docs.map(doc => ({
+            const employeesList = empData.docs.map(doc => ({
                 value: doc.data().number,
                 label: `${doc.data().name} (${doc.data().number})`,
-                section: doc.data().section
+                section: doc.data().section || 'Uncategorized' // Default to Uncategorized
             }));
-            setEmployees(employeeOptions);
+
+            // Group employees by section
+            const groupedEmployees = employeesList.reduce((acc, employee) => {
+                const { section } = employee;
+                if (!acc[section]) {
+                    acc[section] = [];
+                }
+                acc[section].push(employee);
+                return acc;
+            }, {});
+
+            // Format for react-select
+            const groupedOptions = Object.keys(groupedEmployees).sort().map(section => ({
+                label: section,
+                options: groupedEmployees[section]
+            }));
+
+            setEmployees(groupedOptions);
 
             // Fetch lost time codes
             const lostTimeCodesCollectionRef = collection(db, 'lostTimeCodes');
