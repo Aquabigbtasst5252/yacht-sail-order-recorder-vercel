@@ -78,6 +78,17 @@ const styles = StyleSheet.create({
         marginTop: 20,
         fontSize: 10,
         color: 'grey',
+    },
+    footer: {
+        position: 'absolute',
+        bottom: 15,
+        left: 30,
+        right: 30,
+        textAlign: 'center',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        fontSize: 9,
+        color: 'grey',
     }
 });
 
@@ -97,7 +108,7 @@ const WeeklySchedulePDF = ({ ordersByCustomer, shippedOrders, selectedWeek }) =>
                             <Text style={styles.customerHeader}>{customerName}</Text>
                             <View style={styles.table}>
                                 {/* Header Row */}
-                                <View style={styles.tableRow}>
+                                <View style={styles.tableRow} fixed>
                                     <Text style={{...styles.tableColHeader, ...styles.mainTableCol}}>Aqua Order #</Text>
                                     <Text style={{...styles.tableColHeader, ...styles.mainTableCol}}>Customer PO</Text>
                                     <Text style={{...styles.tableColHeader, ...styles.mainTableCol}}>IFS Order #</Text>
@@ -129,8 +140,8 @@ const WeeklySchedulePDF = ({ ordersByCustomer, shippedOrders, selectedWeek }) =>
                     <View break>
                         <Text style={styles.shippedHeader}>Shipped Orders</Text>
                         <View style={styles.table}>
-                             {/* Header Row for Shipped */}
-                            <View style={styles.tableRow}>
+                            {/* Header Row for Shipped */}
+                            <View style={styles.tableRow} fixed>
                                 <Text style={{...styles.tableColHeader, ...styles.shippedTableCol}}>Aqua Order #</Text>
                                 <Text style={{...styles.tableColHeader, ...styles.shippedTableCol}}>Customer PO</Text>
                                 <Text style={{...styles.tableColHeader, ...styles.shippedTableCol}}>Customer</Text>
@@ -152,6 +163,10 @@ const WeeklySchedulePDF = ({ ordersByCustomer, shippedOrders, selectedWeek }) =>
                         </View>
                     </View>
                 )}
+                <View style={styles.footer} fixed>
+                    <Text>Prepared by Chamal Madushanke</Text>
+                    <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+                </View>
             </Page>
         </Document>
     );
