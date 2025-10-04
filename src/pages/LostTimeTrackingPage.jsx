@@ -119,6 +119,8 @@ const LostTimeTrackingPage = ({ user }) => {
                 ...codeOptions,
                 { value: 'machine_breakdown', label: 'Machine Breakdown' }
             ];
+            // Sort the codes alphabetically by label
+            allLostTimeCodes.sort((a, b) => a.label.localeCompare(b.label));
             setLostTimeCodes(allLostTimeCodes);
 
             // Fetch machines
