@@ -1,4 +1,3 @@
-// src/pages/LostTimeTrackingPage.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
@@ -33,9 +32,10 @@ const LostTimeTrackingPage = ({ user }) => {
     const [filterStartDate, setFilterStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 7)));
     const [filterEndDate, setFilterEndDate] = useState(new Date());
 
-    // Pagination state
+    // Pagination and Tab state
     const [currentPage, setCurrentPage] = useState(1);
     const [entriesPerPage] = useState(20);
+    const [activeTab, setActiveTab] = useState('All');
 
     const handleSearch = () => {
         const startOfDay = new Date(filterStartDate);
@@ -49,6 +49,7 @@ const LostTimeTrackingPage = ({ user }) => {
         });
         setFilteredEntries(results);
         setCurrentPage(1); // Reset to first page on new search
+        setActiveTab('All'); // Reset to "All" tab on new search
         toast.success(`${results.length} entries found.`);
     };
 
@@ -97,16 +98,36 @@ const LostTimeTrackingPage = ({ user }) => {
         fetchLostTimeEntries();
     }, []);
 
+    // Get unique sections for tabs from all filtered entries
+    const sections = useMemo(() => {
+        const allSections = [...new Set(filteredEntries.map(entry => entry.section || 'Uncategorized'))];
+        return ['All', ...allSections.sort()];
+    }, [filteredEntries]);
+
+    // Filter entries based on the active tab
+    const entriesForActiveTab = useMemo(() => {
+        if (activeTab === 'All') {
+            return filteredEntries;
+        }
+        return filteredEntries.filter(entry => (entry.section || 'Uncategorized') === activeTab);
+    }, [filteredEntries, activeTab]);
+
+    // Reset page to 1 when tab changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab]);
+
     // Pagination logic
     const indexOfLastEntry = currentPage * entriesPerPage;
     const indexOfFirstEntry = indexOfLastEntry - entriesPerPage;
-    const currentEntries = filteredEntries.slice(indexOfFirstEntry, indexOfLastEntry);
-    const totalPages = Math.ceil(filteredEntries.length / entriesPerPage);
+    const currentEntries = entriesForActiveTab.slice(indexOfFirstEntry, indexOfLastEntry);
+    const totalPages = Math.ceil(entriesForActiveTab.length / entriesPerPage);
 
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
-    const groupedEntries = useMemo(() => {
-        return currentEntries.reduce((acc, entry) => {
+    // Group all filtered entries for PDF export, not just the current page
+    const groupedEntriesForPdf = useMemo(() => {
+        return filteredEntries.reduce((acc, entry) => {
             const section = entry.section || 'Uncategorized';
             if (!acc[section]) {
                 acc[section] = [];
@@ -114,7 +135,7 @@ const LostTimeTrackingPage = ({ user }) => {
             acc[section].push(entry);
             return acc;
         }, {});
-    }, [currentEntries]);
+    }, [filteredEntries]);
 
     const handleExportPDF = () => {
         const doc = new jsPDF({
@@ -144,13 +165,13 @@ const LostTimeTrackingPage = ({ user }) => {
             "Lost Time Reason", "Start Time", "End Time", "Duration (mins)"
         ];
 
-        Object.entries(groupedEntries).forEach(([section, entries]) => {
+        Object.entries(groupedEntriesForPdf).forEach(([section, entries]) => {
             // Add section header
             doc.setFontSize(14);
             doc.text(`Section: ${section}`, 10, startY - 5);
 
             const tableRows = entries.map((entry, index) => {
-                 if (!entry.startTime || !entry.endTime || !entry.startDate) {
+                if (!entry.startTime || !entry.endTime || !entry.startDate) {
                     return [index + 1, "Invalid data", "", "", "", "", "", "", ""];
                 }
                 const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000;
@@ -179,7 +200,7 @@ const LostTimeTrackingPage = ({ user }) => {
                     startY = data.cursor.y + 15;
                 }
             });
-             // Update startY for the next table on the same page
+            // Update startY for the next table on the same page
             startY = doc.lastAutoTable.finalY + 15;
 
             // Add a new page if the next table will overflow
@@ -285,30 +306,30 @@ const LostTimeTrackingPage = ({ user }) => {
                                 </div>
                             </div>
                         </div>
-                    <div className="row">
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Order Number</label>
-                            <input type="text" className="form-control" value={orderNumber} onChange={e => setOrderNumber(e.target.value)} />
+                        <div className="row">
+                            <div className="col-md-6 mb-3">
+                                <label className="form-label">Order Number</label>
+                                <input type="text" className="form-control" value={orderNumber} onChange={e => setOrderNumber(e.target.value)} />
+                            </div>
+                            <div className="col-md-6 mb-3">
+                                <label className="form-label">Order Quantity</label>
+                                <input type="number" className="form-control" value={orderQuantity} onChange={e => setOrderQuantity(e.target.value)} />
+                            </div>
                         </div>
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Order Quantity</label>
-                            <input type="number" className="form-control" value={orderQuantity} onChange={e => setOrderQuantity(e.target.value)} />
+                        <div className="row">
+                            <div className="col-md-6 mb-3">
+                                <label className="form-label">EPF Number (Employee)</label>
+                                <Select options={employees} value={selectedEmployee} onChange={setSelectedEmployee} isClearable isSearchable placeholder="Search by name or EPF number..." />
+                            </div>
+                            <div className="col-md-6 mb-3">
+                                <label className="form-label">Lost Time Code</label>
+                                <Select options={lostTimeCodes} value={selectedLostTimeCode} onChange={setSelectedLostTimeCode} isClearable placeholder="Select a lost time code..." />
+                            </div>
                         </div>
-                    </div>
-                    <div className="row">
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">EPF Number (Employee)</label>
-                            <Select options={employees} value={selectedEmployee} onChange={setSelectedEmployee} isClearable isSearchable placeholder="Search by name or EPF number..." />
+                        <div className="mb-3">
+                            <label className="form-label">Signature of Responsible Person</label>
+                            <input type="text" className="form-control" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} />
                         </div>
-                        <div className="col-md-6 mb-3">
-                            <label className="form-label">Lost Time Code</label>
-                             <Select options={lostTimeCodes} value={selectedLostTimeCode} onChange={setSelectedLostTimeCode} isClearable placeholder="Select a lost time code..." />
-                        </div>
-                    </div>
-                    <div className="mb-3">
-                        <label className="form-label">Signature of Responsible Person</label>
-                        <input type="text" className="form-control" value={responsiblePerson} onChange={e => setResponsiblePerson(e.target.value)} />
-                    </div>
                         <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                             {isSubmitting ? 'Saving...' : 'Save Entry'}
                         </button>
@@ -328,95 +349,102 @@ const LostTimeTrackingPage = ({ user }) => {
                     </div>
                 </div>
                 <div className="card-body">
-                    {filteredEntries.length > 0 ? (
-                        Object.entries(groupedEntries).map(([section, entries]) => (
-                            <div key={section} className="mb-4">
-                                <h4 className="mb-3 text-capitalize" style={{ borderBottom: '2px solid #6c757d', paddingBottom: '0.5rem' }}>
-                                    Section: {section}
-                                </h4>
-                                <div className="table-responsive">
-                                    <table className="table table-striped">
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Employee</th>
-                                                <th>Lost Time Reason</th>
-                                                <th>Order #</th>
-                                                <th>Duration (mins)</th>
-                                                {user.role === 'super_admin' && <th>Actions</th>}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {entries.map(entry => {
-                                                if (!entry.startTime || !entry.endTime || !entry.startDate) {
-                                                    return (
-                                                        <tr key={entry.id}>
-                                                            {user.role === 'super_admin' ? (
-                                                                <>
-                                                                    <td colSpan="5">Invalid data for this entry.</td>
-                                                                    <td>
-                                                                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>
-                                                                            Delete
-                                                                        </button>
-                                                                    </td>
-                                                                </>
-                                                            ) : (
-                                                                <td colSpan="5">Invalid data for this entry.</td>
-                                                            )}
-                                                        </tr>
-                                                    );
-                                                }
-                                                const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000;
+                    <ul className="nav nav-tabs">
+                        {sections.map(section => (
+                            <li className="nav-item" key={section}>
+                                <button
+                                    className={`nav-link ${activeTab === section ? 'active' : ''}`}
+                                    onClick={() => setActiveTab(section)}
+                                >
+                                    {section}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                    <div className="tab-content mt-3">
+                        <div className="table-responsive">
+                            <table className="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Employee</th>
+                                        <th>Section</th>
+                                        <th>Lost Time Reason</th>
+                                        <th>Order #</th>
+                                        <th>Duration (mins)</th>
+                                        {user.role === 'super_admin' && <th>Actions</th>}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {currentEntries.length > 0 ? (
+                                        currentEntries.map(entry => {
+                                            if (!entry.startTime || !entry.endTime || !entry.startDate) {
                                                 return (
                                                     <tr key={entry.id}>
-                                                        <td>{format(entry.startDate.toDate(), 'yyyy-MM-dd')}</td>
-                                                        <td>{entry.employeeName}</td>
-                                                        <td>{entry.lostTimeReason}</td>
-                                                        <td>{entry.orderNumber}</td>
-                                                        <td>{duration.toFixed(2)}</td>
+                                                        <td colSpan={user.role === 'super_admin' ? 7 : 6}>
+                                                            Invalid data for this entry.
+                                                        </td>
                                                         {user.role === 'super_admin' && (
                                                             <td>
-                                                                <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>
-                                                                    Delete
-                                                                </button>
+                                                                <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>Delete</button>
                                                             </td>
                                                         )}
                                                     </tr>
                                                 );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="text-center">
-                            <p>No entries found for the selected date range.</p>
+                                            }
+                                            const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000;
+                                            return (
+                                                <tr key={entry.id}>
+                                                    <td>{format(entry.startDate.toDate(), 'yyyy-MM-dd')}</td>
+                                                    <td>{entry.employeeName}</td>
+                                                    <td>{entry.section}</td>
+                                                    <td>{entry.lostTimeReason}</td>
+                                                    <td>{entry.orderNumber}</td>
+                                                    <td>{duration.toFixed(2)}</td>
+                                                    {user.role === 'super_admin' && (
+                                                        <td>
+                                                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(entry.id)}>
+                                                                Delete
+                                                            </button>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={user.role === 'super_admin' ? 7 : 6} className="text-center">
+                                                No entries found for this section.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
-                    )}
-                    {totalPages > 1 && (
-                        <nav>
-                            <ul className="pagination justify-content-center">
-                                <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                                    <button onClick={() => paginate(currentPage - 1)} className="page-link">
-                                        Previous
-                                    </button>
-                                </li>
-                                {[...Array(totalPages).keys()].map(number => (
-                                    <li key={number + 1} className={`page-item ${currentPage === number + 1 ? 'active' : ''}`}>
-                                        <button onClick={() => paginate(number + 1)} className="page-link">
-                                            {number + 1}
+                        {totalPages > 1 && (
+                            <nav>
+                                <ul className="pagination justify-content-center">
+                                    <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                                        <button onClick={() => paginate(currentPage - 1)} className="page-link">
+                                            Previous
                                         </button>
                                     </li>
-                                ))}
-                                <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                                    <button onClick={() => paginate(currentPage + 1)} className="page-link">
-                                        Next
-                                    </button>
-                                </li>
-                            </ul>
-                        </nav>
-                    )}
+                                    {[...Array(totalPages).keys()].map(number => (
+                                        <li key={number + 1} className={`page-item ${currentPage === number + 1 ? 'active' : ''}`}>
+                                            <button onClick={() => paginate(number + 1)} className="page-link">
+                                                {number + 1}
+                                            </button>
+                                        </li>
+                                    ))}
+                                    <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                                        <button onClick={() => paginate(currentPage + 1)} className="page-link">
+                                            Next
+                                        </button>
+                                    </li>
+                                </ul>
+                            </nav>
+                        )}
+                    </div>
                 </div>
             </div>
         </>
