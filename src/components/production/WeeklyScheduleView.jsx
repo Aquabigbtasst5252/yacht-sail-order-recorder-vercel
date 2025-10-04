@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { db } from '../../firebase';
 import { collection, query, where, onSnapshot, orderBy, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { pdf } from '@react-pdf/renderer';
+import WeeklySchedulePDF from '../reports/WeeklySchedulePDF';
 import OrderHistoryModal from '../modals/OrderHistoryModal';
 
 const getWeek = (date) => {
@@ -19,7 +21,7 @@ const getCurrentWeek = () => {
     return `${year}-${String(week).padStart(2, '0')}`;
 };
 
-const WeeklyScheduleView = ({ user, onNavigate }) => {
+const WeeklyScheduleView = ({ user }) => {
     const [allOrders, setAllOrders] = useState([]);
     const [productionStatuses, setProductionStatuses] = useState([]);
     const [deliveryWeeks, setDeliveryWeeks] = useState([]);
@@ -27,6 +29,7 @@ const WeeklyScheduleView = ({ user, onNavigate }) => {
     const [stoppingOrder, setStoppingOrder] = useState(null);
     const [stopReason, setStopReason] = useState('');
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const isCustomer = user.role === 'customer';
 
     useEffect(() => {
@@ -138,16 +141,48 @@ const WeeklyScheduleView = ({ user, onNavigate }) => {
             status.productTypeIds?.includes(order.productId)
         );
     };
+
+    const handleExportPdf = async () => {
+        if (!selectedWeek) {
+            toast.error('Please select a week to export.');
+            return;
+        }
+        setIsGeneratingPdf(true);
+        toast.loading('Generating PDF...');
+
+        try {
+            const doc = <WeeklySchedulePDF ordersByCustomer={ordersByCustomer} shippedOrders={shippedOrders} selectedWeek={selectedWeek} />;
+            const blob = await pdf(doc).toBlob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const weekNumber = selectedWeek.split('-')[1];
+            link.href = url;
+            link.download = `production-schedule-week-${weekNumber}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            toast.dismiss();
+            toast.success('PDF downloaded successfully!');
+        } catch (error) {
+            console.error("Error generating PDF: ", error);
+            toast.dismiss();
+            toast.error('Failed to generate PDF.');
+        } finally {
+            setIsGeneratingPdf(false);
+        }
+    };
     
     return (
         <div>
             <div className="d-flex justify-content-end align-items-center mb-3">
                 {!isCustomer && (
                     <button
-                        className="btn btn-info me-3"
-                        onClick={() => onNavigate('production-schedule-report')}
+                        className="btn btn-primary me-3"
+                        onClick={handleExportPdf}
+                        disabled={isGeneratingPdf || !selectedWeek}
                     >
-                        Production Schedule Report
+                        {isGeneratingPdf ? 'Generating...' : 'Export as PDF'}
                     </button>
                 )}
                 <div className="col-md-4">

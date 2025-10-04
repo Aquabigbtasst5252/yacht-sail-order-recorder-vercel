@@ -5,7 +5,7 @@ import OrderHistoryView from '../components/production/OrderHistoryView';
 import AllActiveOrdersView from '../components/production/AllActiveOrdersView';
 import ShippedOrdersView from '../components/production/ShippedOrdersView';
 
-const ProductionPage = ({ user, onNavigate }) => {
+const ProductionPage = ({ user }) => {
     const [activeTab, setActiveTab] = useState('schedule');
 
     return (
@@ -31,7 +31,7 @@ const ProductionPage = ({ user, onNavigate }) => {
                 </ul>
             </div>
             <div className="card-body">
-                {activeTab === 'schedule' && <WeeklyScheduleView user={user} onNavigate={onNavigate} />}
+                {activeTab === 'schedule' && <WeeklyScheduleView user={user} />}
                 {activeTab === 'history' && <OrderHistoryView user={user} />}
                 {activeTab === 'allActive' && user.role !== 'customer' && <AllActiveOrdersView user={user} />}
                 {activeTab === 'shipped' && user.role !== 'customer' && <ShippedOrdersView user={user} />}
