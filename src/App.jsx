@@ -83,14 +83,20 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-        let unsubUserData, unsubSettings;
+        const unsubSettings = onSnapshot(doc(db, "settings", "main"), (settingsDoc) => {
+            if (settingsDoc.exists()) {
+                setSettings(prev => ({ ...prev, ...settingsDoc.data() }));
+            }
+        });
+        return () => unsubSettings();
+    }, []);
+
+    useEffect(() => {
+        let unsubUserData;
         if (user) {
             unsubUserData = onSnapshot(doc(db, "users", user.uid), (userDoc) => {
                 const data = userDoc.data();
                 setUserData(data);
-                unsubSettings = onSnapshot(doc(db, "settings", "main"), (settingsDoc) => {
-                    if (settingsDoc.exists()) setSettings(settingsDoc.data());
-                });
                 setLoading(false);
             }, () => setLoading(false));
         } else {
@@ -99,7 +105,6 @@ export default function App() {
        
         return () => {
             if (unsubUserData) unsubUserData();
-            if (unsubSettings) unsubSettings();
         };
     }, [user]);
 
@@ -123,9 +128,9 @@ export default function App() {
         if (appStatus === 'public') {
             const publicPageMap = {
                 'home': <HomePage onLoginSuccess={() => handleNavigation('dashboard')} settings={settings} />,
-                'about': <AboutPage />,
-                'services': <ServicesPage />,
-                'contact': <ContactPage />,
+                'about': <AboutPage settings={settings} />,
+                'services': <ServicesPage settings={settings} />,
+                'contact': <ContactPage settings={settings} />,
             };
             return (
                 <div className="d-flex flex-column" style={{minHeight: '100vh'}}>
