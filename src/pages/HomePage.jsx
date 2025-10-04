@@ -130,14 +130,15 @@ const HomePage = ({ onLoginSuccess, settings }) => {
         );
     };
 
+    const homeContent = settings?.homeContent || {};
+
     return (
         <div className="container mt-5">
             <div className="row align-items-center g-5">
                 <div className="col-lg-7 text-center text-lg-start">
-                    <h1 className="display-4 fw-bold lh-1 mb-3">Welcome to the Aqua Dynamics Client Portal</h1>
+                    <h1 className="display-4 fw-bold lh-1 mb-3">{homeContent.title || "Welcome to the Client Portal"}</h1>
                     <p className="col-lg-10 fs-5">
-                        Manage your yacht sail orders, track production status, and view your stock levels all in one place.
-                        Access your account to get started.
+                        {homeContent.subtitle || "Manage your orders, track production, and view stock levels all in one place. Access your account to get started."}
                     </p>
                 </div>
                 <div className="col-lg-5">
