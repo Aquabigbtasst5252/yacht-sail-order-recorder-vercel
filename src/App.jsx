@@ -26,7 +26,6 @@ import ProductionScheduleReport from './pages/ProductionScheduleReport'; // Rena
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPanel from './pages/AdminPanel';
-import MachineBreakdownPage from './pages/MachineBreakdownPage';
 import LostTimeTrackingPage from './pages/LostTimeTrackingPage';
 import ComprehensiveReport from './pages/ComprehensiveReport'; // New Report Page
 
@@ -156,7 +155,6 @@ export default function App() {
                     case 'reports': return (isAdmin || isProduction) ? <ReportsPage onNavigate={handleNavigation} /> : <Dashboard user={userData} />;
                     case 'production-schedule-report': return (isAdmin || isProduction) ? <ProductionScheduleReport /> : <Dashboard user={userData} />;
                     case 'comprehensive-report': return (isAdmin || isProduction) ? <ComprehensiveReport /> : <Dashboard user={userData} />;
-                    case 'machine-breakdown': return (isAdmin || isProduction) ? <MachineBreakdownPage user={userData} /> : <Dashboard user={userData} />;
                     case 'lost-time-tracking': return (isAdmin || isProduction) ? <LostTimeTrackingPage user={userData} /> : <Dashboard user={userData} />;
                     case 'settings': return isAdmin ? <SettingsPage /> : <Dashboard user={userData} />;
                     case 'admin': return isAdmin ? <AdminPanel /> : <Dashboard user={userData} />;
