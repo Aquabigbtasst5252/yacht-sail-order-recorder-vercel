@@ -90,15 +90,21 @@ const ProductionScheduleReport = () => {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const ordersQuery = query(collection(db, "orders"), where("status", "!=", "Cancelled"));
+        // Fetch orders that are in a state relevant to production scheduling
+        const relevantStatuses = ["New", "In Production", "Cut", "Staged"];
+        const ordersQuery = query(collection(db, "orders"), where("status", "in", relevantStatuses));
+
         const unsubscribe = onSnapshot(ordersQuery, (snap) => {
             const ordersData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             setAllOrders(ordersData);
-            // Filter out shipped orders before generating the list of weeks
-            const nonShippedOrders = ordersData.filter(o => o.status?.toLowerCase() !== 'shipped');
-            const weeks = [...new Set(nonShippedOrders.map(o => o.deliveryWeek).filter(Boolean))];
-            weeks.sort();
+
+            // Generate the list of unique delivery weeks from the fetched orders
+            const weeks = [...new Set(ordersData.map(o => o.deliveryWeek).filter(Boolean))];
+            weeks.sort(); // Sort weeks chronologically
             setDeliveryWeeks(weeks);
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching production schedule orders:", error);
             setIsLoading(false);
         });
 
