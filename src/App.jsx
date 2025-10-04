@@ -22,7 +22,6 @@ import NewOrderForm from './pages/NewOrderForm';
 import OrderList from './pages/OrderList';
 import ProductionPage from './pages/ProductionPage';
 import CustomerStock from './pages/CustomerStock';
-import ProductionScheduleReport from './pages/ProductionScheduleReport'; // Renamed from ReportsPage
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPanel from './pages/AdminPanel';
@@ -153,7 +152,6 @@ export default function App() {
                     case 'planning': return <ProductionPage user={userData} />;
                     case 'stock': return <CustomerStock user={userData} />;
                     case 'reports': return (isAdmin || isProduction) ? <ReportsPage onNavigate={handleNavigation} /> : <Dashboard user={userData} />;
-                    case 'production-schedule-report': return (isAdmin || isProduction) ? <ProductionScheduleReport /> : <Dashboard user={userData} />;
                     case 'comprehensive-report': return (isAdmin || isProduction) ? <ComprehensiveReport /> : <Dashboard user={userData} />;
                     case 'lost-time-tracking': return (isAdmin || isProduction) ? <LostTimeTrackingPage user={userData} /> : <Dashboard user={userData} />;
                     case 'settings': return isAdmin ? <SettingsPage /> : <Dashboard user={userData} />;
