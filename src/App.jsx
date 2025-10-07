@@ -6,7 +6,6 @@ import { Toaster } from 'react-hot-toast';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
-import { loadScript } from './helpers';
 
 // --- Component Imports ---
 import PublicHeader from './components/PublicHeader';
@@ -45,9 +44,6 @@ export default function App() {
     };
 
     useEffect(() => {
-        loadScript("https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js")
-            .catch(err => console.error("Failed to load XLSX script:", err));
-        
         const applyTheme = () => {
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                 document.documentElement.setAttribute('data-bs-theme', 'dark');
