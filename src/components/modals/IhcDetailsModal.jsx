@@ -46,7 +46,7 @@ const IhcDetailsModal = ({ order, user, onClose }) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                     setUploads(prev => ({ ...prev, [file.name]: progress }));
                 },
-                (uploadError) => {
+                (_uploadError) => {
                     toast.error(`Upload failed for ${file.name}.`);
                     setUploads(prev => {
                         const newUploads = { ...prev };
@@ -68,7 +68,7 @@ const IhcDetailsModal = ({ order, user, onClose }) => {
                             ihcStickerImages: arrayUnion(newPhoto)
                         });
                         toast.success("Sticker image uploaded.");
-                    } catch (firestoreError) {
+                    } catch (_firestoreError) {
                         toast.error(`Failed to save photo ${file.name}.`);
                         await deleteObject(uploadTask.snapshot.ref);
                     } finally {
@@ -117,7 +117,7 @@ const IhcDetailsModal = ({ order, user, onClose }) => {
                 ihcStickerImages: updatedPhotos
             });
             toast.success("Sticker image deleted.");
-        } catch (err) {
+        } catch (_err) {
             toast.error("Failed to delete photo.");
         }
     };
@@ -132,7 +132,7 @@ const IhcDetailsModal = ({ order, user, onClose }) => {
             });
             toast.success("IHC details saved!");
             onClose();
-        } catch (err) {
+        } catch (_err) {
             toast.error('Failed to save details.');
         } finally {
             setIsSaving(false);

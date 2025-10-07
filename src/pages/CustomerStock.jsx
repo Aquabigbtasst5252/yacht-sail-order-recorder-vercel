@@ -1,5 +1,6 @@
 // src/pages/CustomerStock.jsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { db } from '../firebase';
 import { 
     collection, 
@@ -59,16 +60,6 @@ const CustomerStock = ({ user }) => {
     const fileInputRef = useRef(null);
     const isAdmin = user.role === 'super_admin' || user.role === 'production';
     const isCustomer = user.role === 'customer';
-
-    // This hook dynamically loads the XLSX library when the component mounts
-    useEffect(() => {
-        if (typeof window.XLSX === 'undefined') {
-            const script = document.createElement('script');
-            script.src = "https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js";
-            script.async = true;
-            document.head.appendChild(script);
-        }
-    }, []);
 
     useEffect(() => {
         const unsubSubCategories = onSnapshot(collection(db, "stockSubCategories"), snap => {
@@ -181,10 +172,6 @@ const CustomerStock = ({ user }) => {
             setError("Please select a file to upload.");
             return;
         }
-        if (typeof window.XLSX === 'undefined') {
-            setError("The Excel parsing library is not ready. Please try again in a moment.");
-            return;
-        }
 
         setLoading(true);
         setError("");
@@ -196,10 +183,10 @@ const CustomerStock = ({ user }) => {
         reader.onload = async (e) => {
             try {
                 const data = new Uint8Array(e.target.result);
-                const workbook = window.XLSX.read(data, { type: 'array' });
+                const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                const json = window.XLSX.utils.sheet_to_json(worksheet);
+                const json = XLSX.utils.sheet_to_json(worksheet);
 
                 if (json.length === 0) {
                     setError("The selected Excel file is empty.");

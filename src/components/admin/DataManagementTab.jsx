@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 import { db } from '../../firebase';
 import { 
     collection, 
@@ -309,18 +310,14 @@ const DataManagementTab = () => {
             toast.error("Please select a file first.");
             return;
         }
-        if (typeof window.XLSX === 'undefined') {
-            toast.error("Excel library is not loaded yet. Please try again.");
-            return;
-        }
         setIsUploading(true);
         const toastId = toast.loading("Uploading products...");
 
         const reader = new FileReader();
         reader.onload = async (event) => {
             try {
-                const workbook = window.XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
-                const jsonData = window.XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
+                const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
 
                 const orderTypeMap = new Map(orderTypes.map(ot => [ot.name.toLowerCase(), ot.id]));
                 const existingProductsSet = new Set(products.map(p => `${p.name.toLowerCase()}|${p.orderTypeId}`));
