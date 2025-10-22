@@ -204,7 +204,7 @@ const AllActiveOrdersView = ({ user }) => {
                                             showWeekNumbers
                                             className="form-control form-control-sm"
                                             placeholderText="Select date"
-                                            dateFormat="yyyy-MM-dd"
+                                            dateFormat="dd/MM/yyyy"
                                             disabled={isCustomer}
                                         />
                                     </td>

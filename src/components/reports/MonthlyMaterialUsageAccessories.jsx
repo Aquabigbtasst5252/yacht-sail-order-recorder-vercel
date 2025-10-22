@@ -20,6 +20,10 @@ const MonthlyMaterialUsageAccessories = forwardRef(({ orders }, ref) => {
             }, {});
 
         const sortedMonths = Object.keys(materialUsage).sort();
+        const formattedLabels = sortedMonths.map(month => {
+            const [year, m] = month.split('-');
+            return `${m}/${year}`;
+        });
         const allMaterials = [...new Set(Object.values(materialUsage).flatMap(m => Object.keys(m)))];
         const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'].reverse();
 
@@ -31,10 +35,13 @@ const MonthlyMaterialUsageAccessories = forwardRef(({ orders }, ref) => {
         }));
 
         const tableData = sortedMonths.flatMap(month =>
-            Object.entries(materialUsage[month]).map(([material, quantity]) => ({ month, material, quantity }))
+            Object.entries(materialUsage[month]).map(([material, quantity]) => {
+                const [year, m] = month.split('-');
+                return { month: `${m}/${year}`, material, quantity };
+            })
         );
 
-        return { labels: sortedMonths, datasets, tableData, title: 'Monthly Material Usage (Accessories)' };
+        return { labels: formattedLabels, datasets, tableData, title: 'Monthly Material Usage (Accessories)' };
     }, [orders]);
 
     useImperativeHandle(ref, () => ({
