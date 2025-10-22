@@ -128,7 +128,7 @@ const LostTimeEntries = ({ user }) => {
 
                 const tableRows = groupedBySection[section].map((entry, i) => ([
                     i + 1,
-                    format(entry.startDate.toDate(), 'yyyy-MM-dd'),
+                    format(entry.startDate.toDate(), 'dd/MM/yyyy'),
                     entry.orderNumber,
                     entry.orderQuantity,
                     entry.epfNumber,
@@ -149,7 +149,7 @@ const LostTimeEntries = ({ user }) => {
                 });
             });
         }
-        doc.save(`lost-time-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+        doc.save(`lost-time-report-${format(new Date(), 'dd-MM-yyyy')}.pdf`);
     };
 
     const handleDelete = async (id) => {
@@ -224,7 +224,7 @@ const LostTimeEntries = ({ user }) => {
                                 const duration = (entry.endTime.toDate() - entry.startTime.toDate()) / 60000;
                                 return (
                                     <tr key={entry.id}>
-                                        <td>{format(entry.startDate.toDate(), 'yyyy-MM-dd')}</td>
+                                        <td>{format(entry.startDate.toDate(), 'dd/MM/yyyy')}</td>
                                         <td>{entry.employeeName}</td>
                                         <td>{entry.section}</td>
                                         <td>{entry.lostTimeReason}</td>

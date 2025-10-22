@@ -95,7 +95,7 @@ const ComprehensivePDF = ({ reportData, startDate, endDate }) => (
                 <Text style={styles.reportTitle}>Comprehensive Report</Text>
             </View>
             <Text style={styles.dateRange}>
-                Date Range: {format(startDate, 'yyyy-MM-dd')} to {format(endDate, 'yyyy-MM-dd')}
+                Date Range: {format(startDate, 'dd/MM/yyyy')} to {format(endDate, 'dd/MM/yyyy')}
             </Text>
 
             {reportData.map(({ key, title, chart, headers, tableData }) => {

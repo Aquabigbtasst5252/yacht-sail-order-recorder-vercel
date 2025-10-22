@@ -18,9 +18,15 @@ const MonthlyOrdersSails = forwardRef(({ orders }, ref) => {
 
         const sortedMonths = Object.entries(monthlySails).sort(([a], [b]) => a.localeCompare(b));
 
-        const labels = sortedMonths.map(([month]) => month);
+        const labels = sortedMonths.map(([month]) => {
+            const [year, m] = month.split('-');
+            return `${m}/${year}`;
+        });
         const data = sortedMonths.map(([, totalQuantity]) => totalQuantity);
-        const tableData = sortedMonths.map(([month, totalQuantity]) => ({ month, totalQuantity }));
+        const tableData = sortedMonths.map(([month, totalQuantity]) => {
+            const [year, m] = month.split('-');
+            return { month: `${m}/${year}`, totalQuantity };
+        });
 
         return { labels, data, tableData, title: 'Monthly Orders (Sails)' };
     }, [orders]);
