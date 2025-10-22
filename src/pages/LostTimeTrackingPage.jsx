@@ -401,11 +401,11 @@ const LostTimeTrackingPage = ({ user }) => {
                                 <div className="row">
                                     <div className="col-md-6 mb-3">
                                         <label className="form-label">Date</label>
-                                        <DatePicker selected={startDate} onChange={date => setStartDate(date)} className="form-control" />
+                                        <DatePicker selected={startDate} onChange={date => setStartDate(date)} className="form-control" dateFormat="dd/MM/yyyy" />
                                     </div>
                                     <div className="col-md-6 mb-3">
                                         <label className="form-label">Time</label>
-                                        <DatePicker selected={startTime} onChange={date => setStartTime(date)} showTimeSelect showTimeSelectOnly timeIntervals={15} timeCaption="Time" dateFormat="h:mm aa" className="form-control" />
+                                        <DatePicker selected={startTime} onChange={date => setStartTime(date)} showTimeSelect showTimeSelectOnly timeIntervals={15} timeCaption="Time" dateFormat="HH:mm" className="form-control" />
                                     </div>
                                 </div>
                             </div>
@@ -414,11 +414,11 @@ const LostTimeTrackingPage = ({ user }) => {
                                 <div className="row">
                                     <div className="col-md-6 mb-3">
                                         <label className="form-label">Date</label>
-                                        <DatePicker selected={endDate} onChange={date => setEndDate(date)} className="form-control" />
+                                        <DatePicker selected={endDate} onChange={date => setEndDate(date)} className="form-control" dateFormat="dd/MM/yyyy" />
                                     </div>
                                     <div className="col-md-6 mb-3">
                                         <label className="form-label">Time</label>
-                                        <DatePicker selected={endTime} onChange={date => setEndTime(date)} showTimeSelect showTimeSelectOnly timeIntervals={15} timeCaption="Time" dateFormat="h:mm aa" className="form-control" />
+                                        <DatePicker selected={endTime} onChange={date => setEndTime(date)} showTimeSelect showTimeSelectOnly timeIntervals={15} timeCaption="Time" dateFormat="HH:mm" className="form-control" />
                                     </div>
                                 </div>
                             </div>
