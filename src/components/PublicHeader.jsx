@@ -1,11 +1,12 @@
 // src/components/PublicHeader.jsx
 import React from 'react';
+import defaultLogo from '../assets/defaultLogo.png';
 
 const PublicHeader = ({ onNavigate, settings }) => (
     <nav className="navbar navbar-expand-lg bg-body-tertiary border-bottom shadow-sm sticky-top">
         <div className="container">
             <a className="navbar-brand" href="#" onClick={(e) => { e.preventDefault(); onNavigate('home'); }}>
-                <img src={settings.logoUrl || 'https://i.imgur.com/cAyxfn7.png'} alt="Logo" style={{height: '40px'}} />
+                <img src={settings.logoUrl || defaultLogo} alt="Logo" style={{height: '40px'}} />
             </a>
             <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#publicNavbar">
                 <span className="navbar-toggler-icon"></span>
