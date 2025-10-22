@@ -14,6 +14,7 @@ import {
 import QcModal from '../components/modals/QcModal';
 import OrderHistoryModal from '../components/modals/OrderHistoryModal';
 import IhcDetailsModal from '../components/modals/IhcDetailsModal';
+import ExportToExcel from '../components/ExportToExcel';
 
 const OrderList = ({ user }) => {
     const [orders, setOrders] = useState([]);
@@ -163,6 +164,9 @@ const OrderList = ({ user }) => {
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
+                </div>
+                <div className="ms-3">
+                    <ExportToExcel orders={orders} />
                 </div>
             </div>
             <div className="card-body">
