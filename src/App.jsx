@@ -145,7 +145,7 @@ export default function App() {
         }
 
         if (appStatus === 'active') {
-             const isAdmin = userData.role === 'super_admin';
+             const isAdmin = userData.role === 'super_admin' || userData.role === 'admin';
              const isProduction = userData.role === 'production';
              const renderPage = () => {
                 switch(currentPage) {

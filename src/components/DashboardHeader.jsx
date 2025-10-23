@@ -2,7 +2,7 @@
 import React from 'react';
 
 const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
-    const isAdmin = user.role === 'super_admin';
+    const isAdmin = user.role === 'super_admin' || user.role === 'admin';
     const isProduction = user.role === 'production';
     const isCustomer = user.role === 'customer';
 
