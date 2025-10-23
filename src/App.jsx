@@ -25,7 +25,8 @@ import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPanel from './pages/AdminPanel';
 import LostTimeTrackingPage from './pages/LostTimeTrackingPage';
-import ComprehensiveReport from './pages/ComprehensiveReport'; // New Report Page
+import ComprehensiveReport from './pages/ComprehensiveReport';
+import TemporaryStopPage from './pages/TemporaryStopPage';
 
 // --- Main App Component ---
 export default function App() {
@@ -157,6 +158,7 @@ export default function App() {
                     case 'lost-time-tracking': return (isAdmin || isProduction) ? <LostTimeTrackingPage user={userData} /> : <Dashboard user={userData} />;
                     case 'settings': return isAdmin ? <SettingsPage /> : <Dashboard user={userData} />;
                     case 'admin': return isAdmin ? <AdminPanel /> : <Dashboard user={userData} />;
+                    case 'temporary-stop': return (isAdmin || isProduction) ? <TemporaryStopPage user={userData} /> : <Dashboard user={userData} />;
                     case 'dashboard': default: return <Dashboard user={userData} />;
                 }
              };
@@ -181,4 +183,3 @@ export default function App() {
         </>
     );
 }
-
