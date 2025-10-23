@@ -2,7 +2,7 @@
 import React from 'react';
 
 const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
-    const isAdmin = user.role === 'super_admin';
+    const isAdmin = user.role === 'super_admin' || user.role === 'admin';
     const isProduction = user.role === 'production';
     const isCustomer = user.role === 'customer';
 
@@ -69,6 +69,7 @@ const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('planning'); }}>Production Schedule</a></li>}
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('lost-time-tracking'); }}>Daily Lost Time</a></li>}
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('reports'); }}>Reports</a></li>}
+                            {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('temporary-stop'); }}>Temporary Stop</a></li>}
                             
                             {isAdmin && <li><hr className="dropdown-divider" /></li>}
                             {isAdmin && <li><a className="dropdown-item fw-bold" href="#" onClick={(e) => { e.preventDefault(); onNavigate('admin'); }}>Admin Panel</a></li>}
