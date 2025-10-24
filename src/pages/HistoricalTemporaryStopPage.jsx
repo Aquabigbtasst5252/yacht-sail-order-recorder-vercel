@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { db } from '../firebase';
@@ -91,7 +90,7 @@ const HistoricalTemporaryStopPage = ({ user }) => {
                         placeholderText="End Date"
                         className="form-control"
                     />
-                     <button className="btn btn-sm btn-outline-secondary" onClick={handleClearDates}>Clear</button>
+                    <button className="btn btn-sm btn-outline-secondary" onClick={handleClearDates}>Clear</button>
                 </div>
                 <div className="ms-3">
                     <ExportToExcel orders={history} />
@@ -123,7 +122,7 @@ const HistoricalTemporaryStopPage = ({ user }) => {
                                     <td>{`${entry.productName} - ${entry.material}`}</td>
                                     <td>{entry.reason}</td>
                                     <td>{entry.changedBy}</td>
-                                </tr>
+                                tr>
                             ))}
                         </tbody>
                     </table>
@@ -133,7 +132,7 @@ const HistoricalTemporaryStopPage = ({ user }) => {
                         <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
                             <button className="page-link" onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>Previous</button>
                         </li>
-                         <li className={`page-item ${currentPage >= totalPages ? 'disabled' : ''}`}>
+                        <li className={`page-item ${currentPage >= totalPages ? 'disabled' : ''}`}>
                             <button className="page-link" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}>Next</button>
                         </li>
                     </ul>
