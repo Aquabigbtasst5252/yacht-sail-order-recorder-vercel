@@ -6,7 +6,8 @@ import {
     query,
     where,
     onSnapshot,
-    orderBy
+    orderBy,
+    getDoc
 } from 'firebase/firestore';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -35,8 +36,16 @@ const HistoricalTemporaryStopPage = ({ user }) => {
         );
 
         const unsub = onSnapshot(q,
-            (snap) => {
-                setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            async (snap) => {
+                const historyPromises = snap.docs.map(async (doc) => {
+                    const historyData = doc.data();
+                    const orderRef = doc.ref.parent.parent;
+                    const orderSnap = await getDoc(orderRef);
+                    const orderData = orderSnap.exists() ? orderSnap.data() : {};
+                    return { id: doc.id, ...historyData, ...orderData };
+                });
+                const combinedData = await Promise.all(historyPromises);
+                setHistory(combinedData);
             },
             (error) => {
                 console.error("Firestore Error: ", error);
@@ -113,7 +122,7 @@ const HistoricalTemporaryStopPage = ({ user }) => {
                                     <td>{`${entry.productName} - ${entry.material}`}</td>
                                     <td>{entry.reason}</td>
                                     <td>{entry.changedBy}</td>
-                                </tr>
+                                tr>
                             ))}
                         </tbody>
                     </table>
