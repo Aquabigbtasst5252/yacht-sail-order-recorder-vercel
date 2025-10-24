@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import { db } from '../firebase';
 import {
     collection,
@@ -36,9 +37,15 @@ const TemporaryStopPage = ({ user }) => {
             ...queries,
             orderBy("createdAt", "desc")
         );
-        const unsub = onSnapshot(q, snap => {
-            setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
+        const unsub = onSnapshot(q,
+            (snap) => {
+                setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            },
+            (error) => {
+                console.error("Firestore Error: ", error);
+                toast.error("Could not fetch orders. The query requires a composite index. Please check the Firestore console.");
+            }
+        );
         return () => unsub();
     }, [user, startDate, endDate]);
 

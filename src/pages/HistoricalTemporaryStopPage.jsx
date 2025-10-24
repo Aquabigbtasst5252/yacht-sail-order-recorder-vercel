@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import { db } from '../firebase';
 import {
     collectionGroup,
@@ -34,9 +34,15 @@ const HistoricalTemporaryStopPage = ({ user }) => {
             orderBy("timestamp", "desc")
         );
 
-        const unsub = onSnapshot(q, snap => {
-            setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
+        const unsub = onSnapshot(q,
+            (snap) => {
+                setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            },
+            (error) => {
+                console.error("Firestore Error: ", error);
+                toast.error("Could not fetch history. The query requires a composite index. Please check the Firestore console.");
+            }
+        );
 
         return () => unsub();
     }, [user, startDate, endDate]);
@@ -75,7 +81,7 @@ const HistoricalTemporaryStopPage = ({ user }) => {
                         placeholderText="End Date"
                         className="form-control"
                     />
-                     <button className="btn btn-sm btn-outline-secondary" onClick={handleClearDates}>Clear</button>
+                    <button className="btn btn-sm btn-outline-secondary" onClick={handleClearDates}>Clear</button>
                 </div>
                 <div className="ms-3">
                     <ExportToExcel orders={history} />
@@ -117,7 +123,7 @@ const HistoricalTemporaryStopPage = ({ user }) => {
                         <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
                             <button className="page-link" onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>Previous</button>
                         </li>
-                         <li className={`page-item ${currentPage >= totalPages ? 'disabled' : ''}`}>
+                        <li className={`page-item ${currentPage >= totalPages ? 'disabled' : ''}`}>
                             <button className="page-link" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}>Next</button>
                         </li>
                     </ul>
