@@ -70,6 +70,7 @@ const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('lost-time-tracking'); }}>Daily Lost Time</a></li>}
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('reports'); }}>Reports</a></li>}
                             {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('temporary-stop'); }}>Temporary Stop</a></li>}
+                            {(isAdmin || isProduction) && <li><a className="dropdown-item" href="#" onClick={(e) => { e.preventDefault(); onNavigate('historical-temporary-stop'); }}>Temporary Stop History</a></li>}
                             
                             {isAdmin && <li><hr className="dropdown-divider" /></li>}
                             {isAdmin && <li><a className="dropdown-item fw-bold" href="#" onClick={(e) => { e.preventDefault(); onNavigate('admin'); }}>Admin Panel</a></li>}
