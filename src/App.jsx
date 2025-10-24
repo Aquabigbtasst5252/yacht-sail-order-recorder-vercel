@@ -27,6 +27,7 @@ import AdminPanel from './pages/AdminPanel';
 import LostTimeTrackingPage from './pages/LostTimeTrackingPage';
 import ComprehensiveReport from './pages/ComprehensiveReport';
 import TemporaryStopPage from './pages/TemporaryStopPage';
+import HistoricalTemporaryStopPage from './pages/HistoricalTemporaryStopPage';
 
 // --- Main App Component ---
 export default function App() {
@@ -159,6 +160,7 @@ export default function App() {
                     case 'settings': return isAdmin ? <SettingsPage /> : <Dashboard user={userData} />;
                     case 'admin': return isAdmin ? <AdminPanel /> : <Dashboard user={userData} />;
                     case 'temporary-stop': return (isAdmin || isProduction) ? <TemporaryStopPage user={userData} /> : <Dashboard user={userData} />;
+                    case 'historical-temporary-stop': return (isAdmin || isProduction) ? <HistoricalTemporaryStopPage user={userData} /> : <Dashboard user={userData} />;
                     case 'dashboard': default: return <Dashboard user={userData} />;
                 }
              };
