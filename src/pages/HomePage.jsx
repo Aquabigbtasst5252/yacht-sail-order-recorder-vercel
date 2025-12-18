@@ -145,7 +145,7 @@ const HomePage = ({ onLoginSuccess, settings }) => {
                     <div className="card shadow-lg">
                         <div className="card-body p-4 p-md-5">
                             <div className="text-center mb-4">
-                                <img src={settings.logoUrl || 'https://i.imgur.com/cAyxfn7.png'} alt="Company Logo" style={{height: '50px'}} />
+                                <img src={settings.logoUrl || '/logo.png'} alt="Company Logo" style={{height: '50px'}} />
                                 {viewMode !== 'reset' && <p className="text-muted mt-3">{viewMode === 'login' ? 'Sign in to your account' : 'Create a new account'}</p>}
                             </div>
                             

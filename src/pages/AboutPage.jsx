@@ -18,8 +18,11 @@ Our team of master sailmakers, designers, and engineers collaborate closely with
                         {aboutContent.text || defaultText}
                     </div>
                 </div>
-                <div className="col-lg-6">
-                    <img src="https://images.unsplash.com/photo-1589602518993-9610531557a2?q=80&w=2070&auto=format&fit=crop" className="img-fluid rounded-3 shadow-sm" alt="Sailmaking process" />
+                <div className="col-md-6 mb-4 mb-md-0 d-flex align-items-center justify-content-center bg-light rounded-3" style={{ minHeight: '300px' }}>
+                    <div className="text-center text-muted">
+                        <i className="bi bi-image fs-1"></i>
+                        <p>Image Placeholder</p>
+                    </div>
                 </div>
             </div>
         </div>
