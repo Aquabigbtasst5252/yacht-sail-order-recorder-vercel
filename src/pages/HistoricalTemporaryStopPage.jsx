@@ -122,7 +122,7 @@ const HistoricalTemporaryStopPage = ({ user }) => {
                                     <td>{`${entry.productName} - ${entry.material}`}</td>
                                     <td>{entry.reason}</td>
                                     <td>{entry.changedBy}</td>
-                                tr>
+                                </tr>
                             ))}
                         </tbody>
                     </table>
