@@ -19,7 +19,7 @@ Our team of master sailmakers, designers, and engineers collaborate closely with
                     </div>
                 </div>
                 <div className="col-lg-6">
-                    <img src="https://images.unsplash.com/photo-1589602518993-9610531557a2?q=80&w=2070&auto=format&fit=crop" className="img-fluid rounded-3 shadow-sm" alt="Sailmaking process" />
+                    <img src="/about-hero.png" className="img-fluid rounded-3 shadow-sm" alt="Sailmaking process" />
                 </div>
             </div>
         </div>
