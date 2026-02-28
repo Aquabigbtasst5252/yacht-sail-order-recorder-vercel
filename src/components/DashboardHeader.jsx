@@ -11,7 +11,7 @@ const DashboardHeader = ({ user, onSignOut, onNavigate, settings }) => {
             <div className="container-fluid">
                 <div className="d-flex align-items-center">
                     <a className="navbar-brand" href="#" onClick={(e) => { e.preventDefault(); onNavigate('dashboard'); }}>
-                        <img src={settings.logoUrl || 'https://i.imgur.com/cAyxfn7.png'} alt="Logo" style={{height: '32px'}}/>
+                        <img src={settings.logoUrl || '/logo.png'} alt="Logo" style={{height: '32px'}}/>
                     </a>
                     <ul className="navbar-nav d-flex flex-row">
                         {!isCustomer && (
