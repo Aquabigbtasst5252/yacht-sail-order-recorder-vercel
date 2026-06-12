@@ -57,27 +57,36 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser && !currentUser.isAnonymous) {
-                setUser(currentUser);
-                const userDocRef = doc(db, "users", currentUser.uid);
-                const docSnap = await getDoc(userDocRef);
-                if (!docSnap.exists()) {
-                    await setDoc(userDocRef, {
-                        email: currentUser.email,
-                        name: currentUser.displayName || 'New User',
-                        role: 'customer',
-                        status: 'pending',
-                        createdAt: serverTimestamp()
-                    });
-                }
-            } else {
-                setUser(null);
-                setUserData(null);
-                setLoading(false);
-            }
+        // Mock user
+        setUser({ uid: "mockUser123", email: "admin@test.com", displayName: "Admin User" });
+        setUserData({
+            name: "Admin User",
+            email: "admin@test.com",
+            role: "super_admin",
+            status: "active"
         });
-        return () => unsubscribe();
+        setLoading(false);
+        // const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        //     if (currentUser && !currentUser.isAnonymous) {
+        //         setUser(currentUser);
+        //         const userDocRef = doc(db, "users", currentUser.uid);
+        //         const docSnap = await getDoc(userDocRef);
+        //         if (!docSnap.exists()) {
+        //             await setDoc(userDocRef, {
+        //                 email: currentUser.email,
+        //                 name: currentUser.displayName || 'New User',
+        //                 role: 'customer',
+        //                 status: 'pending',
+        //                 createdAt: serverTimestamp()
+        //             });
+        //         }
+        //     } else {
+        //         setUser(null);
+        //         setUserData(null);
+        //         setLoading(false);
+        //     }
+        // });
+        // return () => unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -89,22 +98,22 @@ export default function App() {
         return () => unsubSettings();
     }, []);
 
-    useEffect(() => {
-        let unsubUserData;
-        if (user) {
-            unsubUserData = onSnapshot(doc(db, "users", user.uid), (userDoc) => {
-                const data = userDoc.data();
-                setUserData(data);
-                setLoading(false);
-            }, () => setLoading(false));
-        } else {
-            setLoading(false);
-        }
+    // useEffect(() => {
+    //     let unsubUserData;
+    //     if (user) {
+    //         unsubUserData = onSnapshot(doc(db, "users", user.uid), (userDoc) => {
+    //             const data = userDoc.data();
+    //             setUserData(data);
+    //             setLoading(false);
+    //         }, () => setLoading(false));
+    //     } else {
+    //         setLoading(false);
+    //     }
        
-        return () => {
-            if (unsubUserData) unsubUserData();
-        };
-    }, [user]);
+    //     return () => {
+    //         if (unsubUserData) unsubUserData();
+    //     };
+    // }, [user]);
 
     const appStatus = useMemo(() => {
         if (loading) return 'loading';

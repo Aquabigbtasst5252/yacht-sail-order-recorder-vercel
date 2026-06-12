@@ -1,4 +1,5 @@
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const { defineString } = require("firebase-functions/params"); // Import defineString
 const admin = require("firebase-admin");
@@ -87,5 +88,68 @@ Yacht sail team.`;
         });
     } catch (error) {
         logger.error(`Failed to send QC email for order ${orderId}:`, error);
+    }
+});
+
+exports.sendOrderAckEmail = onCall(async (request) => {
+    const { orderId, toEmails, subject, body, sentBy } = request.data;
+
+    // Check authentication
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'User must be authenticated to send emails.');
+    }
+
+    if (!orderId || !toEmails || !subject || !body) {
+        throw new HttpsError('invalid-argument', 'Missing required fields.');
+    }
+
+    logger.info(`Starting Order Acknowledgment email process for order: ${orderId}`);
+
+    try {
+        const orderRef = db.collection("orders").doc(orderId);
+
+        await db.runTransaction(async (transaction) => {
+            const orderDoc = await transaction.get(orderRef);
+            if (!orderDoc.exists) {
+                throw new HttpsError('not-found', `Order ${orderId} does not exist.`);
+            }
+
+            const orderData = orderDoc.data();
+            if (orderData.orderAckEmailSent) {
+                logger.warn(`Order Acknowledgment email already sent for order ${orderId}. Allowing resend, but updating timestamp.`);
+            }
+
+            const recipientEmails = toEmails.split(',').map(e => e.trim()).filter(e => e);
+            if (recipientEmails.length === 0) {
+                throw new HttpsError('invalid-argument', 'No valid email addresses provided.');
+            }
+
+            const mailOptions = {
+                from: `"Aqua Dynamics" <${gmailEmail.value()}>`,
+                to: recipientEmails,
+                cc: [
+                    "chamal@aquadynamics.lk",
+                    "bandu@aquadynamics.lk",
+                    "prasannaw@aquadynamics.lk",
+                    "udana@aquadynamics.lk"
+                ],
+                subject: subject,
+                text: body,
+            };
+
+            await mailTransport.sendMail(mailOptions);
+            logger.log(`Order Acknowledgment email sent successfully to ${recipientEmails.join(', ')} for order ${orderId}`);
+
+            transaction.update(orderRef, {
+                orderAckEmailSent: true,
+                orderAckEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+                orderAckEmailSentBy: sentBy || request.auth.token.name || 'Unknown User'
+            });
+        });
+
+        return { success: true, message: 'Email sent successfully.' };
+    } catch (error) {
+        logger.error(`Failed to send Order Acknowledgment email for order ${orderId}:`, error);
+        throw new HttpsError('internal', `Failed to send email: ${error.message}`);
     }
 });
