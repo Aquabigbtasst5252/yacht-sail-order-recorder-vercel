@@ -82,7 +82,7 @@ const CustomerManagementTab = () => {
             <form onSubmit={handleAdd} className="row g-3 align-items-end mb-4">
                 <div className="col-sm"><input name="companyName" placeholder="Company Name" className="form-control" required /></div>
                 <div className="col-sm"><input name="contactName" placeholder="Contact Name" className="form-control" /></div>
-                <div className="col-sm"><input type="email" name="email" placeholder="Email" className="form-control" required /></div>
+                <div className="col-sm"><input type="text" name="email" placeholder="Email (comma-separated for multiple)" className="form-control" required /></div>
                 <div className="col-sm-auto"><button type="submit" className="btn btn-primary">Add</button></div>
             </form>
             <h3 className="h5 mb-3">Existing Customers</h3>
@@ -133,8 +133,8 @@ const CustomerManagementTab = () => {
                                         <input name="contactName" defaultValue={editingCustomer.contactName} className="form-control" />
                                     </div>
                                     <div className="mb-3">
-                                        <label className="form-label">Email</label>
-                                        <input type="email" name="email" defaultValue={editingCustomer.email} className="form-control" required />
+                                        <label className="form-label">Email (comma-separated for multiple)</label>
+                                        <input type="text" name="email" defaultValue={editingCustomer.email} className="form-control" required />
                                     </div>
                                 </div>
                                 <div className="modal-footer">

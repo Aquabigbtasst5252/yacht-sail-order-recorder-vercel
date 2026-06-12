@@ -11,7 +11,8 @@ const SettingsPage = () => {
         lastSailOrder: 0, 
         lastAccessoryOrder: 0, 
         qcEmailSubject: "", 
-        qcEmailBody: "" 
+        qcEmailBody: "",
+        orderAckEmailBody: ""
     });
     
     const docRef = doc(db, "settings", "main");
@@ -63,10 +64,24 @@ const SettingsPage = () => {
                     <div className="col-12"><hr /></div>
                     <div className="col-12">
                          <h3 className="h5">Email Templates</h3>
-                         <p className="form-text">Use placeholders: {`{customerName}`}, {`{customerPo}`}, {`{aquaOrderNo}`}</p>
                          <div className="row g-3 mt-1">
-                             <div className="col-12"><label className="form-label">QC Photos Subject</label><input type="text" name="qcEmailSubject" value={settings.qcEmailSubject} onChange={handleChange} className="form-control" /></div>
-                             <div className="col-12"><label className="form-label">QC Photos Body</label><textarea name="qcEmailBody" value={settings.qcEmailBody} onChange={handleChange} rows="6" className="form-control"></textarea></div>
+                             <div className="col-12">
+                                 <h4 className="h6 mt-2">QC Photos Email Template</h4>
+                                 <p className="form-text">Use placeholders: {`{customerName}`}, {`{customerPo}`}, {`{aquaOrderNo}`}</p>
+                                 <div className="row g-2">
+                                     <div className="col-12"><label className="form-label">Subject</label><input type="text" name="qcEmailSubject" value={settings.qcEmailSubject} onChange={handleChange} className="form-control" /></div>
+                                     <div className="col-12"><label className="form-label">Body</label><textarea name="qcEmailBody" value={settings.qcEmailBody} onChange={handleChange} rows="6" className="form-control"></textarea></div>
+                                 </div>
+                             </div>
+
+                             <div className="col-12 mt-4">
+                                 <h4 className="h6">Order Acknowledgment Email Template</h4>
+                                 <p className="form-text">Subject is auto-generated based on PO Number logic.</p>
+                                 <p className="form-text">Use placeholders: {`{{CustomerName}}`}, {`{{PONumber}}`}, {`{{AquaOrderNumber}}`}, {`{{OrderDescription}}`}, {`{{OrderDate}}`}, {`{{Quantity}}`}, {`{{SailType}}`}</p>
+                                 <div className="row g-2">
+                                     <div className="col-12"><label className="form-label">Body</label><textarea name="orderAckEmailBody" value={settings.orderAckEmailBody} onChange={handleChange} rows="8" className="form-control"></textarea></div>
+                                 </div>
+                             </div>
                          </div>
                     </div>
                 </div>

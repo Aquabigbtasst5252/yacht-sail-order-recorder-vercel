@@ -15,6 +15,7 @@ import QcModal from '../components/modals/QcModal';
 import OrderHistoryModal from '../components/modals/OrderHistoryModal';
 import IhcDetailsModal from '../components/modals/IhcDetailsModal';
 import ExportToExcel from '../components/ExportToExcel';
+import OrderAckEmailModal from '../components/modals/OrderAckEmailModal';
 
 const OrderList = ({ user }) => {
     const [orders, setOrders] = useState([]);
@@ -22,6 +23,7 @@ const OrderList = ({ user }) => {
     const [qcOrder, setQcOrder] = useState(null);
     const [viewingHistoryFor, setViewingHistoryFor] = useState(null);
     const [ihcOrder, setIhcOrder] = useState(null);
+    const [ackEmailOrder, setAckEmailOrder] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState('all');
@@ -212,7 +214,8 @@ const OrderList = ({ user }) => {
                                                     <button className="btn btn-sm btn-outline-warning me-1" onClick={() => handleCancelToggle(order)}>
                                                         {order.status === 'Cancelled' ? 'Reactivate' : 'Cancel'}
                                                     </button>
-                                                    <button className="btn btn-sm btn-outline-info" onClick={() => setQcOrder(order)}>QC</button>
+                                                    <button className="btn btn-sm btn-outline-info me-1" onClick={() => setQcOrder(order)}>QC</button>
+                                                    <button className="btn btn-sm btn-outline-secondary" onClick={() => setAckEmailOrder(order)}>Send Ack</button>
                                                 </>
                                             )
                                         ) : (
@@ -284,6 +287,14 @@ const OrderList = ({ user }) => {
                     order={ihcOrder}
                     user={user}
                     onClose={() => setIhcOrder(null)}
+                />
+            )}
+
+            {ackEmailOrder && (
+                <OrderAckEmailModal
+                    order={ackEmailOrder}
+                    user={user}
+                    onClose={() => setAckEmailOrder(null)}
                 />
             )}
         </div>

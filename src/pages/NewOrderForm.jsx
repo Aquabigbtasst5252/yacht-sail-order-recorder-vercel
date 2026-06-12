@@ -6,10 +6,10 @@ import {
     doc,
     onSnapshot,
     collection,
-    addDoc,
     runTransaction,
     serverTimestamp,
 } from "firebase/firestore";
+import OrderAckEmailModal from '../components/modals/OrderAckEmailModal';
 
 const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
     const [orderTypes, setOrderTypes] = useState([]);
@@ -27,6 +27,8 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
     const [isIHC, setIsIHC] = useState(false);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [createdOrder, setCreatedOrder] = useState(null);
+    const [showAckModal, setShowAckModal] = useState(false);
 
     useEffect(() => {
         const unsubOrderTypes = onSnapshot(collection(db, "orderTypes"), snap => {
@@ -97,6 +99,7 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
         };
         
         try {
+            let orderToSave = null;
             const newOrderNumber = await runTransaction(db, async (transaction) => {
                 const settingsRef = doc(db, "settings", "main");
                 const settingsDoc = await transaction.get(settingsRef);
@@ -112,7 +115,7 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
                 
                 const productDoc = products.find(p => p.id === data.productId);
 
-                addDoc(collection(db, 'orders'), { 
+                orderToSave = {
                     ...data, 
                     aquaOrderNumber: orderNumberDisplay, 
                     customerCompanyName: selectedCustomer.label, 
@@ -121,10 +124,16 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
                     createdAt: serverTimestamp(), 
                     createdBy: user.name,
                     status: 'New' 
-                });
+                };
+
+                const newOrderRef = doc(collection(db, 'orders'));
+                transaction.set(newOrderRef, orderToSave);
+                orderToSave.id = newOrderRef.id;
+
                 return orderNumberDisplay;
             });
             onOrderCreated(newOrderNumber);
+            setCreatedOrder(orderToSave);
             toast.success(`Order ${newOrderNumber} created!`, { id: toastId });
             resetForm();
         } catch (error) {
@@ -199,10 +208,23 @@ const NewOrderForm = ({ user, onOrderCreated, lastGeneratedOrderNumber }) => {
                             <h5 className="card-title text-success">Order Created Successfully!</h5>
                             <p className="card-text mb-1">Generated Aqua Order Number:</p>
                             <p className="display-5 text-primary fw-bold">{lastGeneratedOrderNumber}</p>
+                            {createdOrder && (
+                                <button className="btn btn-outline-primary mt-3" onClick={() => setShowAckModal(true)}>
+                                    Send to Customer
+                                </button>
+                            )}
                         </div>
                     </div>
                 )}
             </div>
+
+            {showAckModal && createdOrder && (
+                <OrderAckEmailModal
+                    order={createdOrder}
+                    user={user}
+                    onClose={() => setShowAckModal(false)}
+                />
+            )}
         </div>
     );
 };

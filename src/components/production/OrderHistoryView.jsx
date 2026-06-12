@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { db } from '../../firebase';
 import { collection, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore';
+import OrderAckEmailModal from '../modals/OrderAckEmailModal';
 
 const OrderHistoryView = ({ user }) => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -9,6 +10,7 @@ const OrderHistoryView = ({ user }) => {
     const [orderHistory, setOrderHistory] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showAckModal, setShowAckModal] = useState(false);
 
     const handleSearch = async (e) => {
         e.preventDefault();
@@ -63,7 +65,14 @@ const OrderHistoryView = ({ user }) => {
             {error && <div className="alert alert-danger">{error}</div>}
             {searchedOrder && (
                 <div className="card">
-                    <div className="card-header"><h5 className="mb-0">History for Order: {searchedOrder.aquaOrderNumber}</h5></div>
+                    <div className="card-header d-flex justify-content-between align-items-center">
+                        <h5 className="mb-0">History for Order: {searchedOrder.aquaOrderNumber}</h5>
+                        {user.role !== 'customer' && (
+                            <button className="btn btn-sm btn-outline-primary" onClick={() => setShowAckModal(true)}>
+                                Send Ack Email
+                            </button>
+                        )}
+                    </div>
                     <div className="card-body">
                         <p><strong>Customer:</strong> {searchedOrder.customerCompanyName}</p>
                         <p><strong>Product:</strong> {`${searchedOrder.productName} - ${searchedOrder.material} - ${searchedOrder.size}`}</p>
@@ -80,6 +89,14 @@ const OrderHistoryView = ({ user }) => {
                         </table>
                     </div>
                 </div>
+            )}
+
+            {showAckModal && searchedOrder && (
+                <OrderAckEmailModal
+                    order={searchedOrder}
+                    user={user}
+                    onClose={() => setShowAckModal(false)}
+                />
             )}
         </div>
     );
