@@ -46,7 +46,8 @@ const OrderAckEmailModal = ({ order, user, onClose }) => {
                 setSubject(generatedSubject);
 
                 // Generate Body
-                let template = settings.orderAckEmailBody || '';
+                const defaultTemplate = `Dear {{CustomerName}},\nWe acknowledge receipt of your purchase order {{PONumber}} dated {{OrderDate}}.\nThe order is currently under review. A separate confirmation with estimated production end dates will follow shortly.\nIf any clarification is required in the meantime, we will contact you directly. Best Regards Yacht Sails Team`;
+                let template = settings.orderAckEmailBody || defaultTemplate;
                 const orderDate = order.createdAt?.toDate ? order.createdAt.toDate().toLocaleDateString() : 'N/A';
                 const orderDescription = `${order.productName} - ${order.material}`;
 
