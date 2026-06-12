@@ -276,6 +276,7 @@ const WeeklyScheduleView = ({ user }) => {
             {viewingHistoryFor && (
                 <OrderHistoryModal 
                     order={viewingHistoryFor}
+                    user={user}
                     onClose={() => setViewingHistoryFor(null)}
                 />
             )}
