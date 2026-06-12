@@ -2,10 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
+import OrderAckEmailModal from './OrderAckEmailModal';
 
-const OrderHistoryModal = ({ order, onClose }) => {
+const OrderHistoryModal = ({ order, user, onClose }) => {
     const [history, setHistory] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [showAckModal, setShowAckModal] = useState(false);
 
     useEffect(() => {
         const historyQuery = query(collection(db, "orders", order.id, "statusHistory"), orderBy("timestamp", "desc"));
@@ -20,9 +22,16 @@ const OrderHistoryModal = ({ order, onClose }) => {
         <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }} tabIndex="-1">
             <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div className="modal-content">
-                    <div className="modal-header">
-                        <h5 className="modal-title">History for Order: {order.aquaOrderNumber}</h5>
-                        <button type="button" className="btn-close" onClick={onClose}></button>
+                    <div className="modal-header d-flex justify-content-between align-items-center">
+                        <h5 className="modal-title mb-0">History for Order: {order.aquaOrderNumber}</h5>
+                        <div>
+                            {user && user.role !== 'customer' && (
+                                <button className="btn btn-sm btn-outline-primary me-2" onClick={() => setShowAckModal(true)}>
+                                    Send Ack Email
+                                </button>
+                            )}
+                            <button type="button" className="btn-close" onClick={onClose}></button>
+                        </div>
                     </div>
                     <div className="modal-body">
                         <p><strong>Customer:</strong> {order.customerCompanyName}</p>
@@ -59,6 +68,14 @@ const OrderHistoryModal = ({ order, onClose }) => {
                     </div>
                 </div>
             </div>
+
+            {showAckModal && (
+                <OrderAckEmailModal
+                    order={order}
+                    user={user}
+                    onClose={() => setShowAckModal(false)}
+                />
+            )}
         </div>
     );
 };
