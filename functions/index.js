@@ -72,10 +72,7 @@ Yacht sail team.`;
                 from: `"Aqua Dynamics" <${gmailEmail.value()}>`,
                 to: recipientEmail,
                 cc: [
-                    "chamal@aquadynamics.lk",
-                    "bandu@aquadynamics.lk",
-                    "prasannaw@aquadynamics.lk",
-                    "udana@aquadynamics.lk"
+                    "chamal@aquadynamics.lk"
                 ],
                 subject: subject,
                 text: body,
@@ -128,10 +125,7 @@ exports.sendOrderAckEmail = onCall(async (request) => {
                 from: `"Aqua Dynamics" <${gmailEmail.value()}>`,
                 to: recipientEmails,
                 cc: [
-                    "chamal@aquadynamics.lk",
-                    "bandu@aquadynamics.lk",
-                    "prasannaw@aquadynamics.lk",
-                    "udana@aquadynamics.lk"
+                    "chamal@aquadynamics.lk"
                 ],
                 subject: subject,
                 text: body,
