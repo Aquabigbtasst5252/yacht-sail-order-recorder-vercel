@@ -93,7 +93,7 @@ Yacht sail team.`;
     }
 });
 
-exports.sendOrderAckEmail = onCall(async (request) => {
+exports.sendOrderAckEmail = onCall({ cors: true }, async (request) => {
     const { orderId, toEmails, subject, body, sentBy } = request.data;
 
     // Check authentication
