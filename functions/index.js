@@ -13,14 +13,19 @@ const gmailEmail = defineString("GMAIL_EMAIL");
 const gmailPassword = defineString("GMAIL_PASSWORD");
 const appUrl = defineString("APP_URL");
 
-const mailTransport = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        // Use .value() to access the secret
-        user: gmailEmail.value(),
-        pass: gmailPassword.value(),
-    },
-});
+let mailTransport = null;
+const getMailTransport = () => {
+    if (!mailTransport) {
+        mailTransport = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+                user: gmailEmail.value(),
+                pass: gmailPassword.value(),
+            },
+        });
+    }
+    return mailTransport;
+};
 
 exports.sendQcPhotoEmail = onDocumentCreated("orders/{orderId}/qcPhotos/{photoId}", async (event) => {
     const orderId = event.params.orderId;
@@ -78,7 +83,7 @@ Yacht sail team.`;
                 text: body,
             };
 
-            await mailTransport.sendMail(mailOptions);
+            await getMailTransport().sendMail(mailOptions);
             logger.log(`QC email sent successfully to ${recipientEmail} for order ${orderData.aquaOrderNumber}`);
 
             transaction.update(orderRef, { qcEmailSent: true });
@@ -88,7 +93,7 @@ Yacht sail team.`;
     }
 });
 
-exports.sendOrderAckEmail = onCall(async (request) => {
+exports.sendOrderAckEmail = onCall({ cors: true }, async (request) => {
     const { orderId, toEmails, subject, body, sentBy } = request.data;
 
     // Check authentication
@@ -131,7 +136,7 @@ exports.sendOrderAckEmail = onCall(async (request) => {
                 text: body,
             };
 
-            await mailTransport.sendMail(mailOptions);
+            await getMailTransport().sendMail(mailOptions);
             logger.log(`Order Acknowledgment email sent successfully to ${recipientEmails.join(', ')} for order ${orderId}`);
 
             transaction.update(orderRef, {
