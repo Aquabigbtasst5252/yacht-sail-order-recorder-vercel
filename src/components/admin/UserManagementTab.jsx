@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { db } from '../../firebase';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { db, functions, auth } from '../../firebase';
+import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 
 const UserManagementTab = () => {
     const [users, setUsers] = useState([]);
     const [customers, setCustomers] = useState([]);
     const [editingUserId, setEditingUserId] = useState(null);
     const [editName, setEditName] = useState('');
+    const [changingPasswordUserId, setChangingPasswordUserId] = useState(null);
+    const [newPassword, setNewPassword] = useState('');
+    const [isActionLoading, setIsActionLoading] = useState(false);
     
     useEffect(() => { 
         const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
@@ -51,7 +55,7 @@ const UserManagementTab = () => {
     };
 
     const confirmDeleteUser = (userId, userName) => {
-        const warning = "This only deletes application data, not their login account.";
+        const warning = "This permanently deletes application data and their login account.";
         toast((t) => (
             <div className="d-flex flex-column p-2">
                 <p className="fw-bold text-center">Delete {userName}?</p>
@@ -59,6 +63,7 @@ const UserManagementTab = () => {
                 <div className="d-flex justify-content-center gap-2 mt-2">
                     <button 
                         className="btn btn-sm btn-danger" 
+                        disabled={isActionLoading}
                         onClick={() => {
                             handleDeleteUser(userId);
                             toast.dismiss(t.id);
@@ -78,12 +83,54 @@ const UserManagementTab = () => {
     };
 
     const handleDeleteUser = async (userId) => {
+        if (!auth.currentUser) {
+            toast.error("You must be logged in.");
+            return;
+        }
+        setIsActionLoading(true);
         try {
-            await deleteDoc(doc(db, "users", userId));
+            const deleteUserFn = httpsCallable(functions, 'adminDeleteUser');
+            await deleteUserFn({ userId });
             toast.success('User data deleted successfully.');
         } catch (error) {
             console.error("Error deleting user data: ", error);
-            toast.error('Failed to delete user data.');
+            toast.error(`Failed to delete user data: ${error.message}`);
+        } finally {
+            setIsActionLoading(false);
+        }
+    };
+
+    const handleChangePasswordClick = (user) => {
+        setChangingPasswordUserId(user.id);
+        setNewPassword('');
+    };
+
+    const handleCancelPasswordClick = () => {
+        setChangingPasswordUserId(null);
+        setNewPassword('');
+    };
+
+    const handleSavePasswordClick = async () => {
+        if (!newPassword.trim() || newPassword.length < 6) {
+            toast.error("Password must be at least 6 characters long.");
+            return;
+        }
+        if (!auth.currentUser) {
+            toast.error("You must be logged in.");
+            return;
+        }
+        setIsActionLoading(true);
+        try {
+            const updatePasswordFn = httpsCallable(functions, 'adminUpdateUserPassword');
+            await updatePasswordFn({ userId: changingPasswordUserId, newPassword });
+            toast.success("Password updated successfully.");
+            setChangingPasswordUserId(null);
+            setNewPassword('');
+        } catch (error) {
+            console.error("Error updating password:", error);
+            toast.error(`Failed to update password: ${error.message}`);
+        } finally {
+            setIsActionLoading(false);
         }
     };
 
@@ -156,13 +203,28 @@ const UserManagementTab = () => {
                              <td>
                                 {editingUserId === u.id ? (
                                     <>
-                                        <button className="btn btn-sm btn-success me-2" onClick={handleSaveClick}>Save</button>
-                                        <button className="btn btn-sm btn-secondary" onClick={handleCancelClick}>Cancel</button>
+                                        <button className="btn btn-sm btn-success me-2" onClick={handleSaveClick} disabled={isActionLoading}>Save</button>
+                                        <button className="btn btn-sm btn-secondary" onClick={handleCancelClick} disabled={isActionLoading}>Cancel</button>
                                     </>
+                                ) : changingPasswordUserId === u.id ? (
+                                    <div className="d-flex align-items-center">
+                                        <input
+                                            type="text"
+                                            className="form-control form-control-sm me-2"
+                                            placeholder="New Password"
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            style={{width: '120px'}}
+                                            disabled={isActionLoading}
+                                        />
+                                        <button className="btn btn-sm btn-success me-1" onClick={handleSavePasswordClick} disabled={isActionLoading}>Save</button>
+                                        <button className="btn btn-sm btn-secondary" onClick={handleCancelPasswordClick} disabled={isActionLoading}>Cancel</button>
+                                    </div>
                                 ) : (
                                     <>
-                                    <button className="btn btn-sm btn-outline-primary me-2" onClick={() => handleEditClick(u)}>Edit Name</button>
-                                    <button className="btn btn-sm btn-outline-danger" onClick={() => confirmDeleteUser(u.id, u.name)}>Delete</button>
+                                    <button className="btn btn-sm btn-outline-primary me-2" onClick={() => handleEditClick(u)} disabled={isActionLoading}>Edit Name</button>
+                                    <button className="btn btn-sm btn-outline-warning me-2" onClick={() => handleChangePasswordClick(u)} disabled={isActionLoading}>Reset Pwd</button>
+                                    <button className="btn btn-sm btn-outline-danger" onClick={() => confirmDeleteUser(u.id, u.name)} disabled={isActionLoading}>Delete</button>
                                     </>
                                 )}
                             </td>
