@@ -177,3 +177,93 @@ exports.sendOrderAckEmail = onRequest((req, res) => {
         }
     });
 });
+exports.adminDeleteUser = onRequest((req, res) => {
+    cors(req, res, async () => {
+        if (req.method === "OPTIONS") {
+            return res.status(204).send("");
+        }
+        try {
+            const payload = req.body.data || {};
+            const { userId } = payload;
+
+            const authHeader = req.headers.authorization;
+            if (!authHeader || !authHeader.startsWith("Bearer ")) {
+                return res.status(401).json({ error: { message: "User must be authenticated.", status: "UNAUTHENTICATED" } });
+            }
+            const idToken = authHeader.split("Bearer ")[1];
+            let decodedToken;
+            try {
+                decodedToken = await admin.auth().verifyIdToken(idToken);
+            } catch {
+                return res.status(401).json({ error: { message: "Invalid authentication token.", status: "UNAUTHENTICATED" } });
+            }
+
+            const callerDoc = await db.collection("users").doc(decodedToken.uid).get();
+            if (!callerDoc.exists) {
+                return res.status(403).json({ error: { message: "User document not found.", status: "PERMISSION_DENIED" } });
+            }
+            const callerData = callerDoc.data();
+            if (callerData.role !== 'admin' && callerData.role !== 'super_admin') {
+                return res.status(403).json({ error: { message: "Must be admin to perform this action.", status: "PERMISSION_DENIED" } });
+            }
+
+            if (!userId) {
+                return res.status(400).json({ error: { message: "Missing required fields.", status: "INVALID_ARGUMENT" } });
+            }
+
+            await admin.auth().deleteUser(userId);
+            await db.collection("users").doc(userId).delete();
+
+            return res.status(200).json({ data: { success: true, message: 'User deleted successfully.' } });
+
+        } catch (error) {
+            logger.error(`Failed to delete user:`, error);
+            return res.status(500).json({ error: { message: error.message, status: "INTERNAL" } });
+        }
+    });
+});
+
+exports.adminUpdateUserPassword = onRequest((req, res) => {
+    cors(req, res, async () => {
+        if (req.method === "OPTIONS") {
+            return res.status(204).send("");
+        }
+        try {
+            const payload = req.body.data || {};
+            const { userId, newPassword } = payload;
+
+            const authHeader = req.headers.authorization;
+            if (!authHeader || !authHeader.startsWith("Bearer ")) {
+                return res.status(401).json({ error: { message: "User must be authenticated.", status: "UNAUTHENTICATED" } });
+            }
+            const idToken = authHeader.split("Bearer ")[1];
+            let decodedToken;
+            try {
+                decodedToken = await admin.auth().verifyIdToken(idToken);
+            } catch {
+                return res.status(401).json({ error: { message: "Invalid authentication token.", status: "UNAUTHENTICATED" } });
+            }
+
+            const callerDoc = await db.collection("users").doc(decodedToken.uid).get();
+            if (!callerDoc.exists) {
+                return res.status(403).json({ error: { message: "User document not found.", status: "PERMISSION_DENIED" } });
+            }
+            const callerData = callerDoc.data();
+            if (callerData.role !== 'admin' && callerData.role !== 'super_admin') {
+                return res.status(403).json({ error: { message: "Must be admin to perform this action.", status: "PERMISSION_DENIED" } });
+            }
+
+            if (!userId || !newPassword) {
+                return res.status(400).json({ error: { message: "Missing required fields.", status: "INVALID_ARGUMENT" } });
+            }
+
+            await admin.auth().updateUser(userId, { password: newPassword });
+
+            return res.status(200).json({ data: { success: true, message: 'Password updated successfully.' } });
+
+        } catch (error) {
+            logger.error(`Failed to update password:`, error);
+            return res.status(500).json({ error: { message: error.message, status: "INTERNAL" } });
+        }
+    });
+});
